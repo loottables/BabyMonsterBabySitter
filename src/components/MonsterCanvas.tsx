@@ -1,0 +1,171 @@
+"use client";
+
+import { useEffect, useRef, useMemo } from "react";
+import type { Monster, AnimationState } from "@/types/game";
+import { generateMonster, generateEgg, POOP_SPRITE, type PixelGrid } from "@/lib/monsterGenerator";
+
+const PIXEL = 5;          // CSS px per grid pixel
+const SIZE  = 64 * PIXEL; // 320 CSS px
+
+// ── helpers ────────────────────────────────────────────────────────────────
+
+function buildOffscreen(grid: PixelGrid): HTMLCanvasElement {
+  const oc  = document.createElement("canvas");
+  oc.width  = 64;
+  oc.height = 64;
+  const ctx = oc.getContext("2d")!;
+  const img = ctx.createImageData(64, 64);
+  for (let i = 0; i < 64 * 64; i++) {
+    const v = grid[i];
+    if (v === 0) { img.data[i * 4 + 3] = 0; continue; }
+    const g = v - 1;
+    img.data[i * 4]     = g;
+    img.data[i * 4 + 1] = g;
+    img.data[i * 4 + 2] = g;
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return oc;
+}
+
+function drawPoop(ctx: CanvasRenderingContext2D, px: number, py: number) {
+  for (const [dx, dy, v] of POOP_SPRITE) {
+    const g = v - 1;
+    ctx.fillStyle = `rgb(${g},${g},${g})`;
+    ctx.fillRect((px + dx) * PIXEL, (py + dy) * PIXEL, PIXEL, PIXEL);
+  }
+}
+
+function crackCountFromProgress(p: number): number {
+  if (p < 0.50) return 0;
+  if (p < 0.70) return 1;
+  if (p < 0.85) return 2;
+  if (p < 0.95) return 4;
+  return 6;
+}
+
+// ── component ─────────────────────────────────────────────────────────────
+
+interface Props {
+  monster: Monster;
+  anim:    AnimationState;
+}
+
+export default function MonsterCanvas({ monster, anim }: Props) {
+  const canvasRef  = useRef<HTMLCanvasElement>(null);
+  const rafRef     = useRef<number>(0);
+  const startRef   = useRef<number>(0);
+  const animRef    = useRef<AnimationState>(anim);
+  const monsterRef = useRef<Monster>(monster);
+
+  // Egg offscreen cache: only rebuilt when crackCount threshold changes
+  const eggCacheRef = useRef<{ count: number; oc: HTMLCanvasElement } | null>(null);
+
+  // Monster sprite: regenerated only when seed changes
+  const grid = useMemo(() => generateMonster(monster.seed), [monster.seed]);
+
+  useEffect(() => { animRef.current    = anim;    }, [anim]);
+  useEffect(() => { monsterRef.current = monster; }, [monster]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    const monsterOC = buildOffscreen(grid);
+    startRef.current = performance.now();
+
+    function frame(ts: number) {
+      const elapsed = ts - startRef.current;
+      const m       = monsterRef.current;
+      const curAnim = animRef.current;
+
+      ctx.clearRect(0, 0, SIZE, SIZE);
+
+      // ── EGG branch ─────────────────────────────────────────────────────
+      if (!m.isHatched) {
+        const totalMs   = m.hatchTime - m.birthday;
+        const progress  = totalMs > 0
+          ? Math.min(1, (Date.now() - m.birthday) / totalMs)
+          : 0;
+        const cracks    = crackCountFromProgress(progress);
+
+        // Rebuild egg offscreen only when crack threshold changes
+        if (!eggCacheRef.current || eggCacheRef.current.count !== cracks) {
+          eggCacheRef.current = { count: cracks, oc: buildOffscreen(generateEgg(m.seed, cracks)) };
+        }
+        const eggOC = eggCacheRef.current.oc;
+
+        // Wobble increases with progress; gentle bob otherwise
+        const wobbleStrength = progress > 0.70 ? (progress - 0.70) / 0.30 : 0;
+        const xOff = wobbleStrength > 0
+          ? Math.sin(elapsed / 130) * wobbleStrength * 4
+          : 0;
+        const yOff = wobbleStrength > 0
+          ? -Math.abs(Math.sin(elapsed / 200)) * wobbleStrength * 3
+          : Math.sin(elapsed / 700) * 1;
+
+        ctx.save();
+        ctx.translate(SIZE / 2 + xOff * PIXEL, SIZE / 2 + yOff * PIXEL);
+        ctx.translate(-SIZE / 2, -SIZE / 2);
+        ctx.drawImage(eggOC, 0, 0, SIZE, SIZE);
+        ctx.restore();
+
+        rafRef.current = requestAnimationFrame(frame);
+        return;
+      }
+
+      // ── MONSTER branch ──────────────────────────────────────────────────
+      let yOff = 0, xScale = 1, yScale = 1, alpha = 1;
+
+      if (curAnim === "idle") {
+        yOff = Math.sin(elapsed / 520) * 2.5;
+      } else if (curAnim === "eating") {
+        const t = (elapsed % 700) / 700;
+        yScale = 1 + Math.sin(t * Math.PI) * 0.14;
+        xScale = 1 - Math.sin(t * Math.PI) * 0.07;
+      } else if (curAnim === "training") {
+        yOff = -Math.abs(Math.sin(elapsed / 220)) * 9;
+      } else if (curAnim === "cleaning") {
+        xScale = 1 + Math.sin(elapsed / 120) * 0.05;
+      } else if (curAnim === "happy") {
+        yOff   = Math.sin(elapsed / 200) * 4;
+        xScale = 1 + Math.sin(elapsed / 180) * 0.04;
+      } else if (curAnim === "dead") {
+        yOff  = Math.min(30, elapsed / 80);
+        alpha = Math.max(0, 1 - elapsed / 2500);
+      }
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const cx = SIZE / 2, cy = SIZE / 2;
+      ctx.translate(cx, cy + yOff * PIXEL);
+      ctx.scale(xScale, yScale);
+      ctx.translate(-cx, -cy);
+      ctx.drawImage(monsterOC, 0, 0, SIZE, SIZE);
+      ctx.restore();
+
+      for (const poop of m.poops) {
+        const px = Math.round(poop.x * 54);
+        const py = Math.round(poop.y * 54) + 4;
+        drawPoop(ctx, px, py);
+      }
+
+      rafRef.current = requestAnimationFrame(frame);
+    }
+
+    rafRef.current = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [grid]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={SIZE}
+      height={SIZE}
+      className="rounded-xl border-2 border-monster-border bg-monster-bg"
+      style={{ imageRendering: "pixelated" }}
+    />
+  );
+}

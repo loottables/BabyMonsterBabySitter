@@ -1,0 +1,68 @@
+export type TrainingType = "pushups" | "situps" | "sprint" | "endurance";
+
+export interface RPGStats {
+  hp: number;
+  maxHp: number;
+  atk: number;
+  def: number;
+  agi: number;
+  spd: number;
+  end: number;  // endurance — each 5 pts adds 1 to max energy
+  level: number;
+  exp: number;
+  expToNext: number;
+}
+
+export interface CareStats {
+  hunger: number;      // 0–100
+  happiness: number;  // 0–100
+  cleanliness: number; // 0–100
+  energy: number;     // 0–maxEnergy (5 + floor(end/5))
+}
+
+export interface Poop {
+  id: string;
+  x: number; // canvas-fraction 0–1
+  y: number;
+}
+
+export interface Monster {
+  id: string;
+  name: string;
+  seed: number;
+  rpg: RPGStats;
+  care: CareStats;
+  age: number;            // in-game days elapsed
+  birthday: number;       // unix ms
+  lastUpdated: number;    // unix ms — for offline decay
+  trainingsToday: number;
+  lastTrainingDay: number; // in-game day index
+  lastPoopTime: number;   // unix ms — last automatic poop
+  poops: Poop[];
+  isDead: boolean;
+  deathTime?: number;
+  neglectStart: number | null; // when hunger first hit 0
+  sadStart: number | null;     // when happiness first hit 0
+  // Egg hatching
+  isHatched: boolean;
+  hatchTime: number;      // unix ms when the egg hatches
+}
+
+export interface TrainingExercise {
+  id: TrainingType;
+  name: string;
+  description: string;
+  statLabel: string;
+  energyCost: number;
+  hungerCost: number;
+  statGain: number;
+  expGain: number;
+}
+
+export type AnimationState =
+  | "idle"
+  | "eating"
+  | "training"
+  | "happy"
+  | "cleaning"
+  | "dead";
