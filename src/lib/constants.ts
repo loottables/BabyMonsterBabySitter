@@ -21,6 +21,7 @@ export const POOP_HAPPINESS_DRAIN_PER_MIN = 0.5;
 // Death timers
 export const NEGLECT_DEATH_MS = 3 * 60 * 1000;    // 3 min at 0 hunger → death
 export const SADNESS_DEATH_MS = 5 * 60 * 1000;    // 5 min at 0 happiness → death
+export const HUNGER_ENERGY_DRAIN_MS = 5 * 60 * 1000; // drain 1 energy per 5 min while starving
 
 // Feed / clean values
 export const FEED_HUNGER_GAIN = 30;

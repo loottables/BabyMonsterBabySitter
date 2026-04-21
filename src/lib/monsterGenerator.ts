@@ -150,10 +150,9 @@ function addSatelliteShape(
   base: number,
 ) {
   const [dx, dy] = SAT_DIR[zone];
-  // Centre the satellite so it overlaps the body by ~35% of its size
-  const overlap = size * 0.65;
-  const scx = Math.round(attach.x + dx * overlap);
-  const scy = Math.round(attach.y + dy * overlap);
+  // Place satellite center so it overlaps the body by ~60% of size (guaranteed pixel contact)
+  const scx = Math.round(attach.x + dx * size * 0.4);
+  const scy = Math.round(attach.y + dy * size * 0.4);
 
   switch (shape) {
     case "circle":
@@ -163,7 +162,6 @@ function addSatelliteShape(
       shadedRect(g, scx - size, scy - size, size * 2, size * 2, base);
       break;
     case "oval": {
-      // Stretch the oval along the outward direction
       const isHoriz = Math.abs(dx) > Math.abs(dy);
       const rx = isHoriz ? size + 2 : size;
       const ry = isHoriz ? size     : size + 2;
@@ -174,18 +172,19 @@ function addSatelliteShape(
       shadedDiamond(g, scx, scy, size, base);
       break;
     case "triangle": {
-      // Tip points outward; base straddles the attachment point
-      const perpX = -dy, perpY = dx; // 90° rotation of direction
-      const spread = size * 0.8;
-      const tipX = Math.round(attach.x + dx * size * 1.4);
-      const tipY = Math.round(attach.y + dy * size * 1.4);
-      const b1x  = Math.round(attach.x + perpX * spread);
-      const b1y  = Math.round(attach.y + perpY * spread);
-      const b2x  = Math.round(attach.x - perpX * spread);
-      const b2y  = Math.round(attach.y - perpY * spread);
-      // Use body base color with slight variation
-      const col = Math.max(2, Math.min(252, base));
-      fillTriangle(g, tipX, tipY, b1x, b1y, b2x, b2y, col);
+      // Base is pushed inward so it overlaps the body; tip points outward
+      const perpX = -dy, perpY = dx;
+      const spread = size * 0.9;
+      const inset  = size * 0.5; // how far the base sits inside the body edge
+      const baseX  = Math.round(attach.x - dx * inset);
+      const baseY  = Math.round(attach.y - dy * inset);
+      const tipX   = Math.round(attach.x + dx * size * 1.2);
+      const tipY   = Math.round(attach.y + dy * size * 1.2);
+      const b1x    = Math.round(baseX + perpX * spread);
+      const b1y    = Math.round(baseY + perpY * spread);
+      const b2x    = Math.round(baseX - perpX * spread);
+      const b2y    = Math.round(baseY - perpY * spread);
+      fillTriangle(g, tipX, tipY, b1x, b1y, b2x, b2y, Math.max(2, Math.min(252, base)));
       break;
     }
   }
@@ -695,23 +694,20 @@ function addEar(
 
   switch (style) {
     case "pointy":
-      set(g, p.x, p.y - 1, col);
-      set(g, p.x + s, p.y - 1, col);
-      set(g, p.x, p.y - 2, col);
-      set(g, p.x + s, p.y - 2, col);
-      set(g, p.x, p.y - 3, col);
-      set(g, p.x + s * 1, p.y - 4, dark);
+      // 2-px wide base tapering to a point
+      fillRect(g, p.x - 1, p.y - 2, 3, 2, col);
+      fillRect(g, p.x,     p.y - 4, 2, 2, col);
+      set(g, p.x + (s > 0 ? 1 : 0), p.y - 5, dark);
       break;
 
     case "round":
-      fillCircle(g, p.x + s * 2, p.y - 3, 3, col);
+      fillCircle(g, p.x + s * 2, p.y - 3, 4, col);
       break;
 
     case "floppy": {
-      // droopy ear going sideways-down
-      const ex = p.x + s * 2;
-      fillRect(g, Math.min(ex, p.x), p.y, Math.abs(ex - p.x) + 2, 4, col);
-      fillRect(g, ex, p.y + 2, 2, 4, col);
+      // droopy ear — 3px thick horizontal then drops down
+      fillRect(g, p.x + Math.min(0, s * 4), p.y - 1, 5, 3, col);
+      fillRect(g, p.x + s * 3,              p.y + 1,  3, 4, col);
       break;
     }
   }
@@ -720,31 +716,39 @@ function addEar(
 type AntennaStyle = "ball" | "fork" | "star";
 
 function addAntenna(g: PixelGrid, p: Pt, style: AntennaStyle, col: number) {
-  // Stem
-  for (let i = 1; i <= 5; i++) set(g, p.x, p.y - i, col);
+  // 2-px wide stem
+  for (let i = 1; i <= 5; i++) {
+    set(g, p.x,     p.y - i, col);
+    set(g, p.x + 1, p.y - i, col);
+  }
 
   switch (style) {
     case "ball":
-      fillCircle(g, p.x, p.y - 7, 2, col);
+      fillCircle(g, p.x, p.y - 7, 3, col);
       break;
     case "fork":
-      drawLine(g, p.x, p.y - 5, p.x - 2, p.y - 8, col);
-      drawLine(g, p.x, p.y - 5, p.x + 2, p.y - 8, col);
+      // each prong is 2px wide
+      for (let i = 0; i < 4; i++) {
+        set(g, p.x - 1 - i, p.y - 6 - i, col);
+        set(g, p.x - 2 - i, p.y - 6 - i, col);
+        set(g, p.x + 2 + i, p.y - 6 - i, col);
+        set(g, p.x + 3 + i, p.y - 6 - i, col);
+      }
       break;
     case "star":
-      set(g, p.x - 1, p.y - 6, col); set(g, p.x + 1, p.y - 6, col);
-      set(g, p.x, p.y - 7, col);
-      set(g, p.x - 1, p.y - 8, col); set(g, p.x + 1, p.y - 8, col);
+      fillCircle(g, p.x, p.y - 7, 2, col);
+      set(g, p.x - 2, p.y - 7, col); set(g, p.x + 3, p.y - 7, col);
+      set(g, p.x,     p.y - 9, col); set(g, p.x + 1, p.y - 9, col);
       break;
   }
 }
 
 function addHorn(g: PixelGrid, p: Pt, side: "left" | "right", col: number) {
-  const s = side === "left" ? -1 : 1;
-  set(g, p.x,        p.y - 1, col);
-  set(g, p.x + s,    p.y - 1, col);
-  set(g, p.x,        p.y - 2, col);
-  set(g, p.x + s,    p.y - 3, col);
+  const dark = Math.max(2, col - 40);
+  // 2-px wide base tapering to tip
+  fillRect(g, p.x - 1, p.y - 2, 3, 2, col);
+  fillRect(g, p.x - 1, p.y - 4, 2, 2, col);
+  set(g, p.x,          p.y - 5, dark);
 }
 
 type ArmStyle = "stubby" | "claw" | "long" | "wing";
@@ -755,31 +759,41 @@ function addArm(g: PixelGrid, p: Pt, side: "left" | "right", style: ArmStyle, co
 
   switch (style) {
     case "stubby":
-      fillRect(g, p.x + s, p.y - 1, s * 3 || 3, 3, col);
+      // 3-px wide nub
+      fillRect(g, p.x + (s > 0 ? 1 : -3), p.y - 1, 3, 3, col);
       break;
 
-    case "claw":
-      for (let i = 1; i <= 4; i++) set(g, p.x + s * i, p.y, col);
-      set(g, p.x + s * 4, p.y - 1, dark);
-      set(g, p.x + s * 5, p.y - 1, dark);
-      set(g, p.x + s * 4, p.y + 1, dark);
-      set(g, p.x + s * 5, p.y + 2, dark);
+    case "claw": {
+      // 2-px tall arm shaft + 2-px claw tips
+      for (let i = 1; i <= 4; i++) {
+        set(g, p.x + s * i, p.y - 1, col);
+        set(g, p.x + s * i, p.y,     col);
+      }
+      set(g, p.x + s * 4, p.y - 2, dark); set(g, p.x + s * 5, p.y - 2, dark);
+      set(g, p.x + s * 4, p.y + 1, dark); set(g, p.x + s * 5, p.y + 2, dark);
       break;
+    }
 
     case "long": {
-      // upper arm
-      for (let i = 1; i <= 3; i++) set(g, p.x + s * i, p.y - 1, col);
-      // forearm going down
-      for (let i = 0; i < 3; i++) set(g, p.x + s * 3, p.y + i, col);
-      // hand
-      for (let i = 0; i < 3; i++) set(g, p.x + s * (2 + i), p.y + 3, col);
+      // 2-px tall upper arm extending sideways
+      for (let i = 1; i <= 4; i++) {
+        set(g, p.x + s * i, p.y - 1, col);
+        set(g, p.x + s * i, p.y,     col);
+      }
+      // 2-px wide forearm going down
+      for (let i = 1; i <= 4; i++) {
+        set(g, p.x + s * 4, p.y + i, col);
+        set(g, p.x + s * 3, p.y + i, col);
+      }
+      // 3-px hand
+      fillRect(g, p.x + s * 2, p.y + 4, 3, 2, col);
       break;
     }
 
     case "wing": {
-      // triangular wing shape
-      for (let i = 0; i < 5; i++) {
-        const wh = 4 - i;
+      // filled triangular wing — at least 2px wide at every row
+      for (let i = 0; i < 6; i++) {
+        const wh = Math.max(2, 5 - i);
         for (let j = 0; j < wh; j++)
           set(g, p.x + s * (i + 1), p.y - j, col);
       }
@@ -796,54 +810,59 @@ function addLeg(g: PixelGrid, p: Pt, side: "left" | "right", style: LegStyle, co
 
   switch (style) {
     case "stubby":
-      set(g, p.x, p.y + 1, col);
-      set(g, p.x, p.y + 2, col);
-      set(g, p.x + s, p.y + 2, col);
-      set(g, p.x - s, p.y + 2, col);
+      // 3-px wide short leg
+      fillRect(g, p.x - 1, p.y + 1, 3, 3, col);
       break;
 
     case "long":
-      for (let i = 1; i <= 5; i++) set(g, p.x, p.y + i, col);
-      set(g, p.x - 1, p.y + 5, dark);
-      set(g, p.x,     p.y + 5, dark);
-      set(g, p.x + 1, p.y + 5, dark);
-      set(g, p.x + s * 2, p.y + 4, dark);
+      // 2-px wide shaft
+      for (let i = 1; i <= 5; i++) {
+        set(g, p.x,     p.y + i, col);
+        set(g, p.x + 1, p.y + i, col);
+      }
+      // 3-px wide foot
+      fillRect(g, p.x - 1, p.y + 5, 4, 2, dark);
       break;
 
     case "paw":
-      for (let i = 1; i <= 3; i++) set(g, p.x, p.y + i, col);
-      // toes
-      set(g, p.x - 1, p.y + 4, col);
-      set(g, p.x,     p.y + 4, col);
-      set(g, p.x + 1, p.y + 4, col);
+      // 2-px wide shin
+      for (let i = 1; i <= 4; i++) {
+        set(g, p.x,     p.y + i, col);
+        set(g, p.x + 1, p.y + i, col);
+      }
+      // 3 toes
+      fillRect(g, p.x - 1, p.y + 5, 4, 2, col);
       break;
   }
 }
 
 function addTail(g: PixelGrid, p: Pt, col: number, rng: RNG) {
   const curl = rng.nextInt(0, 1);
-  // base
-  set(g, p.x + 1, p.y, col);
-  set(g, p.x + 2, p.y - 1, col);
-  set(g, p.x + 3, p.y - 2, col);
+  // 2-px wide diagonal tail base
+  fillRect(g, p.x + 1, p.y - 1, 2, 2, col);
+  fillRect(g, p.x + 2, p.y - 2, 2, 2, col);
+  fillRect(g, p.x + 3, p.y - 3, 2, 2, col);
   if (curl === 0) {
-    set(g, p.x + 4, p.y - 2, col);
-    set(g, p.x + 4, p.y - 1, col);
-    set(g, p.x + 3, p.y, col);
+    // curl back
+    fillRect(g, p.x + 4, p.y - 3, 2, 2, col);
+    fillRect(g, p.x + 5, p.y - 2, 2, 2, col);
+    fillRect(g, p.x + 5, p.y - 1, 2, 2, col);
   } else {
-    set(g, p.x + 4, p.y - 3, col);
-    set(g, p.x + 5, p.y - 3, col);
+    // straight tip
+    fillRect(g, p.x + 4, p.y - 4, 2, 2, col);
+    fillRect(g, p.x + 5, p.y - 5, 2, 2, col);
   }
 }
 
 function addSpikes(g: PixelGrid, cx: number, cy: number, hh: number, count: number, col: number) {
   const dark = Math.max(2, col - 50);
   for (let i = 0; i < count; i++) {
-    const sx = cx - 8 + i * 4;
+    const sx = cx - 8 + i * 5;
     const sy = cy - hh;
-    set(g, sx, sy - 1, dark);
-    set(g, sx, sy - 2, dark);
-    set(g, sx, sy - 3, dark);
+    // 2-px wide spike tapering to a point
+    fillRect(g, sx, sy - 1, 2, 2, dark);
+    fillRect(g, sx, sy - 3, 2, 2, dark);
+    set(g,         sx,     sy - 4, dark);
   }
 }
 

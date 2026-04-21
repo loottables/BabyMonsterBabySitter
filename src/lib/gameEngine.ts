@@ -10,6 +10,7 @@ import {
   POOP_HAPPINESS_DRAIN_PER_MIN,
   NEGLECT_DEATH_MS,
   SADNESS_DEATH_MS,
+  HUNGER_ENERGY_DRAIN_MS,
   FEED_HUNGER_GAIN,
   FEED_HAPPINESS_GAIN,
   CLEAN_CLEANLINESS_GAIN,
@@ -105,8 +106,9 @@ export function createMonster(): Monster {
     lastPoopTime:     t,
     poops:            [],
     isDead:           false,
-    neglectStart:     null,
-    sadStart:         null,
+    neglectStart:           null,
+    sadStart:               null,
+    lastHungerEnergyDrain:  null,
     isHatched:        EGG_HATCH_MS === 0,
     hatchTime:        t + EGG_HATCH_MS,
   };
@@ -173,8 +175,23 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
       m.isDead    = true;
       m.deathTime = m.neglectStart + NEGLECT_DEATH_MS;
     }
+
+    // Energy drain while starving: 1 immediately, then 1 per 5 min
+    const drainStart = m.neglectStart;
+    if (m.lastHungerEnergyDrain === null) {
+      // First drain — immediate when hunger hits 0
+      if (m.care.energy > 0) m.care.energy = Math.max(0, m.care.energy - 1);
+      m.lastHungerEnergyDrain = drainStart;
+    } else {
+      const drainsDue = Math.floor((toTime - m.lastHungerEnergyDrain) / HUNGER_ENERGY_DRAIN_MS);
+      if (drainsDue > 0) {
+        if (m.care.energy > 0) m.care.energy = Math.max(0, m.care.energy - drainsDue);
+        m.lastHungerEnergyDrain += drainsDue * HUNGER_ENERGY_DRAIN_MS;
+      }
+    }
   } else {
-    m.neglectStart = null;
+    m.neglectStart           = null;
+    m.lastHungerEnergyDrain  = null;
   }
 
   // Sadness timer (happiness)
@@ -252,7 +269,7 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
   const exercise = TRAINING_EXERCISES.find(e => e.id === type);
   if (!exercise) return { ok: false, message: "Unknown exercise." };
 
-  if (Math.floor(monster.care.energy) < 1)
+  if (Math.round(monster.care.energy) < 1)
     return { ok: false, message: `Not enough energy!` };
 
   let rpg = { ...monster.rpg };
@@ -308,6 +325,8 @@ export function loadMonster(): Monster | null {
     if (m.isHatched === undefined) m.isHatched = true;
     // Migrate saves created before the endurance stat
     if (m.rpg.end === undefined) m.rpg.end = 5;
+    // Migrate saves created before hunger energy drain tracking
+    if (m.lastHungerEnergyDrain === undefined) m.lastHungerEnergyDrain = null;
     // Apply offline decay before returning
     return applyDecay(m, Date.now());
   } catch {

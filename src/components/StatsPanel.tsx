@@ -6,26 +6,22 @@ interface BarProps {
   label: string;
   value: number;
   max?: number;
-  icon: string;
 }
 
-function StatBar({ label, value, max = 100, icon }: BarProps) {
+function StatBar({ label, value, max = 100 }: BarProps) {
   const pct = Math.round((value / max) * 100);
   const low = pct <= 25;
   return (
-    <div className="flex flex-col gap-0.5">
-      <div className="flex items-center justify-between text-xs">
-        <span className="flex items-center gap-1 text-monster-muted">
-          <span>{icon}</span>
-          <span>{label}</span>
-        </span>
-        <span className={`font-mono font-semibold ${low ? "text-white" : "text-monster-muted"}`}>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between" style={{ fontSize: "7px" }}>
+        <span className="text-monster-muted uppercase tracking-wider">{label}</span>
+        <span className={low ? "text-white" : "text-monster-muted"}>
           {Math.round(value)}/{max}
         </span>
       </div>
-      <div className="h-2 w-full rounded-none bg-monster-border overflow-hidden">
+      <div className="h-2 w-full bg-monster-border overflow-hidden">
         <div
-          className="h-full transition-all duration-300 bg-monster-text"
+          className="h-full bg-monster-text transition-all duration-300"
           style={{ width: `${pct}%`, opacity: low ? 0.5 : 1 }}
         />
       </div>
@@ -40,9 +36,9 @@ interface RPGRowProps {
 
 function RPGRow({ label, value }: RPGRowProps) {
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-monster-muted w-14">{label}</span>
-      <span className="font-mono font-bold text-monster-text">{value}</span>
+    <div className="flex items-center justify-between" style={{ fontSize: "7px" }}>
+      <span className="text-monster-muted w-10 uppercase">{label}</span>
+      <span className="text-monster-text">{value}</span>
     </div>
   );
 }
@@ -57,26 +53,37 @@ export default function StatsPanel({ monster }: Props) {
   const maxEnergy = 5 + Math.floor(rpg.end / 5);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {/* Care stats */}
-      <section className="bg-monster-panel border border-monster-border rounded-none p-4 flex flex-col gap-3">
-        <h3 className="text-xs font-semibold tracking-widest text-monster-muted uppercase">
+      <section className="bg-monster-panel border border-monster-border p-3 flex flex-col gap-2">
+        <h3 style={{ fontSize: "6px" }} className="tracking-widest text-monster-muted uppercase mb-1">
           Vitals
         </h3>
-        <StatBar label="Hunger"      value={care.hunger}      icon="🍖" />
-        <StatBar label="Happiness"   value={care.happiness}   icon="💖" />
-        <StatBar label="Cleanliness" value={care.cleanliness} icon="✨" />
-        <StatBar label="Energy"      value={care.energy}      max={maxEnergy} icon="⚡" />
+        <StatBar label="Hunger"  value={care.hunger}      />
+        <StatBar label="Happy"   value={care.happiness}   />
+        <StatBar label="Clean"   value={care.cleanliness} />
+        <StatBar label="Energy"  value={care.energy} max={maxEnergy} />
+        {care.energy < maxEnergy && (() => {
+          const frac = care.energy % 1;
+          const secsLeft = Math.max(1, Math.ceil((frac === 0 ? 1 : 1 - frac) * 1800));
+          const m = Math.floor(secsLeft / 60);
+          const s = secsLeft % 60;
+          return (
+            <p style={{ fontSize: "6px" }} className="text-monster-muted text-right">
+              +1 in {m}:{s.toString().padStart(2, "0")}
+            </p>
+          );
+        })()}
       </section>
 
       {/* RPG stats */}
-      <section className="bg-monster-panel border border-monster-border rounded-none p-4 flex flex-col gap-2">
+      <section className="bg-monster-panel border border-monster-border p-3 flex flex-col gap-1.5">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-xs font-semibold tracking-widest text-monster-muted uppercase">
-            Battle Stats
+          <h3 style={{ fontSize: "6px" }} className="tracking-widest text-monster-muted uppercase">
+            Stats
           </h3>
-          <span className="text-xs font-mono text-monster-text">
-            Lv.{rpg.level}
+          <span style={{ fontSize: "6px" }} className="text-monster-text">
+            LV.{rpg.level}
           </span>
         </div>
 
@@ -88,12 +95,12 @@ export default function StatsPanel({ monster }: Props) {
         <RPGRow label="END" value={rpg.end} />
 
         {/* EXP bar */}
-        <div className="mt-2 flex flex-col gap-0.5">
-          <div className="flex justify-between text-xs text-monster-muted">
-            <span>EXP</span>
-            <span className="font-mono">{rpg.exp}/{rpg.expToNext}</span>
+        <div className="mt-1 flex flex-col gap-1">
+          <div className="flex justify-between" style={{ fontSize: "6px" }}>
+            <span className="text-monster-muted">EXP</span>
+            <span className="text-monster-muted">{rpg.exp}/{rpg.expToNext}</span>
           </div>
-          <div className="h-1.5 w-full rounded-none bg-monster-border overflow-hidden">
+          <div className="h-1.5 w-full bg-monster-border overflow-hidden">
             <div
               className="h-full bg-monster-text transition-all duration-500"
               style={{ width: `${expPct}%` }}
@@ -102,9 +109,8 @@ export default function StatsPanel({ monster }: Props) {
         </div>
       </section>
 
-      {/* Age */}
-      <div className="text-center text-xs text-monster-muted">
-        Day {monster.age} · {monster.name}
+      <div className="text-center text-monster-muted" style={{ fontSize: "6px" }}>
+        DAY {monster.age} / {monster.name.toUpperCase()}
       </div>
     </div>
   );

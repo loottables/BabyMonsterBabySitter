@@ -11,16 +11,21 @@ export default function DeathScreen({ monster, onReset }: Props) {
   const survived = monster.age;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="bg-monster-panel border border-monster-border rounded-none p-8 w-96 flex flex-col items-center gap-6 shadow-2xl text-center font-mono">
-        <div className="text-6xl animate-pulse">💀</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
+      <div className="bg-monster-panel border border-monster-border p-8 w-96 flex flex-col items-center gap-6 text-center">
 
-        <div className="flex flex-col gap-2">
-          <h2 className="text-2xl font-bold text-monster-text">
-            {monster.name} has passed away
+        <p style={{ fontSize: "20px" }} className="text-monster-text">
+          x_x
+        </p>
+
+        <div className="flex flex-col gap-3">
+          <h2 style={{ fontSize: "9px" }} className="text-monster-text uppercase tracking-widest leading-loose">
+            {monster.name} has fallen
           </h2>
-          <p className="text-monster-muted text-sm">
-            Survived <span className="text-monster-text font-semibold">{survived} day{survived !== 1 ? "s" : ""}</span> · reached <span className="text-monster-text font-semibold">Level {monster.rpg.level}</span>
+          <p style={{ fontSize: "7px" }} className="text-monster-muted leading-loose">
+            {survived} day{survived !== 1 ? "s" : ""} survived
+            <br />
+            Level {monster.rpg.level} reached
           </p>
         </div>
 
@@ -34,24 +39,21 @@ export default function DeathScreen({ monster, onReset }: Props) {
             { label: "END", value: monster.rpg.end   },
             { label: "HP",  value: monster.rpg.maxHp },
           ].map(s => (
-            <div key={s.label} className="flex flex-col items-center gap-0.5">
-              <span className="text-xs text-monster-muted">{s.label}</span>
-              <span className="text-lg font-bold text-monster-text">{s.value}</span>
+            <div key={s.label} className="flex flex-col items-center gap-1">
+              <span style={{ fontSize: "5px" }} className="text-monster-muted">{s.label}</span>
+              <span style={{ fontSize: "9px" }} className="text-monster-text">{s.value}</span>
             </div>
           ))}
         </div>
 
-        <p className="text-xs text-monster-muted italic">
-          A new egg awaits — but it won&apos;t hatch right away.
+        <p style={{ fontSize: "6px" }} className="text-monster-muted leading-loose">
+          A new egg awaits...
         </p>
 
         <button
           onClick={onReset}
-          className="
-            w-full py-3 rounded-none font-bold text-sm tracking-widest uppercase
-            bg-monster-panel border border-monster-border
-            text-monster-text hover:bg-monster-border transition-all active:scale-95
-          "
+          style={{ fontSize: "8px" }}
+          className="w-full py-3 border border-monster-border bg-monster-panel text-monster-text uppercase tracking-widest hover:bg-monster-border active:scale-95 transition-all"
         >
           Begin Again
         </button>

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,8 +15,13 @@
 body {
   background-color: #0a0a0f;
   color: #c8c8d4;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  line-height: 1.8;
   min-height: 100vh;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  image-rendering: pixelated;
 }
 
 canvas {
@@ -23,7 +30,6 @@ canvas {
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: #12121a; }
-::-webkit-scrollbar-thumb { background: #1e1e2e; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3b3b5c; }
+::-webkit-scrollbar-thumb { background: #1e1e2e; }
