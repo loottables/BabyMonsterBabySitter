@@ -144,20 +144,6 @@ export default function GameUI() {
     );
   }
 
-  // ── bag view ──────────────────────────────────────────────────────────────
-  if (showBag) {
-    return (
-      <BagView
-        inventory={inventory}
-        monster={monster}
-        message={message}
-        onUse={useItem}
-        onDelete={deleteItem}
-        onClose={() => setShowBag(false)}
-      />
-    );
-  }
-
   // ── active monster ────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto px-4">
@@ -210,6 +196,17 @@ export default function GameUI() {
 
       {monster.isDead && (
         <DeathScreen monster={monster} onReset={spawnMonster} />
+      )}
+
+      {showBag && (
+        <BagView
+          inventory={inventory}
+          monster={monster}
+          message={message}
+          onUse={useItem}
+          onDelete={deleteItem}
+          onClose={() => setShowBag(false)}
+        />
       )}
 
       {settingsBtn}
