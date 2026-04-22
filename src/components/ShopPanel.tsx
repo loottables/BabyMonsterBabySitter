@@ -2,23 +2,26 @@
 
 import { useState } from "react";
 import type { ItemId } from "@/types/items";
-import { ITEM_DEFS, SHOP_ITEMS } from "@/types/items";
+import { ITEM_DEFS, SHOP_ITEMS, SHOP_ITEMS_EXTENDED } from "@/types/items";
 
 interface Anchor { cx: number; top: number; bottom: number; }
 
 interface Props {
-  coins:   number;
-  onBuy:   (itemId: ItemId, price: number) => void;
-  onClose: () => void;
+  coins:           number;
+  hasBeenRenamed:  boolean;
+  onBuy:           (itemId: ItemId, price: number) => void;
+  onClose:         () => void;
 }
 
 const GRID_SIZE = 16;
-const gridSlots: (ItemId | null)[] = [
-  ...SHOP_ITEMS,
-  ...Array(GRID_SIZE - SHOP_ITEMS.length).fill(null),
-];
 
-export default function ShopPanel({ coins, onBuy, onClose }: Props) {
+export default function ShopPanel({ coins, hasBeenRenamed, onBuy, onClose }: Props) {
+  const activeItems = hasBeenRenamed ? SHOP_ITEMS_EXTENDED : SHOP_ITEMS;
+  const gridSlots: (ItemId | null)[] = [
+    ...activeItems,
+    ...Array(GRID_SIZE - activeItems.length).fill(null),
+  ];
+
   const [selected, setSelected] = useState<ItemId | null>(null);
   const [anchor,   setAnchor]   = useState<Anchor | null>(null);
   const [qtyInput, setQtyInput] = useState<string>("1");

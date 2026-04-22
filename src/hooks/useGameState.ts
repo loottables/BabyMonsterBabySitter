@@ -35,6 +35,7 @@ type Action =
   | { type: "USE_ITEM";     slotIndex: number }
   | { type: "DELETE_ITEM";  slotIndex: number }
   | { type: "BUY_ITEM";    itemId: ItemId; price: number }
+  | { type: "RENAME";      name: string }
   | { type: "PET" }
   | { type: "CLEAN" }
   | { type: "TRAIN";        exercise: TrainingType }
@@ -85,6 +86,23 @@ function reducer(state: State, action: Action): State {
       if (!inv) return { ...state, message: "Bag is full!" };
       saveInventory(inv);
       return { ...state, inventory: inv, coins: state.coins - action.price };
+    }
+
+    case "RENAME": {
+      if (!state.monster) return state;
+      if (!state.monster.hasBeenRenamed) {
+        // First rename is free
+        const m = { ...state.monster, name: action.name, hasBeenRenamed: true };
+        return { ...state, monster: m, message: `Renamed to ${action.name}!` };
+      }
+      // Subsequent renames consume a name_change item
+      const slotIdx = state.inventory.findIndex(s => s?.itemId === "name_change");
+      if (slotIdx === -1) return { ...state, message: "You need a Name Change item from the shop!" };
+      const result = consumeSlot(state.inventory, slotIdx);
+      if (!result) return state;
+      saveInventory(result.inv);
+      const m = { ...state.monster, name: action.name };
+      return { ...state, monster: m, inventory: result.inv, message: `Renamed to ${action.name}!` };
     }
 
     case "DELETE_ITEM": {
@@ -212,6 +230,7 @@ export function useGameState() {
   const useItem    = useCallback((i: number) => dispatch({ type: "USE_ITEM",    slotIndex: i }), []);
   const deleteItem = useCallback((i: number) => dispatch({ type: "DELETE_ITEM", slotIndex: i }), []);
   const buyItem    = useCallback((itemId: ItemId, price: number) => dispatch({ type: "BUY_ITEM", itemId, price }), []);
+  const rename     = useCallback((name: string) => dispatch({ type: "RENAME", name }), []);
   const pet        = useCallback(() => dispatch({ type: "PET" }), []);
   const clean      = useCallback(() => dispatch({ type: "CLEAN" }), []);
   const train      = useCallback((ex: TrainingType) => dispatch({ type: "TRAIN", exercise: ex }), []);
@@ -231,6 +250,7 @@ export function useGameState() {
     useItem,
     deleteItem,
     buyItem,
+    rename,
     pet,
     clean,
     train,

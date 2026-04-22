@@ -115,6 +115,7 @@ export function createMonster(): Monster {
     nextPoopTime:     null,
     poops:            [],
     isShiny:          Math.random() < SHINY_CHANCE,
+    hasBeenRenamed:   false,
     isDead:           false,
     neglectStart:           null,
     sadStart:               null,
@@ -323,6 +324,9 @@ export function applyItem(monster: Monster, itemId: ItemId): ActionResult {
       const m = { ...monster, isSick: false, sickStart: null };
       return { ok: true, monster: m, message: `${m.name} is cured!` };
     }
+
+    case "name_change":
+      return { ok: false, message: "Click your monster's name to rename!" };
   }
 }
 
@@ -436,7 +440,8 @@ export function loadMonster(): Monster | null {
     if (m.isSick      === undefined) m.isSick      = false;
     if (m.sickStart   === undefined) m.sickStart   = null;
     if (m.dirtyStart  === undefined) m.dirtyStart  = null;
-    if (m.lastPetTime === undefined) m.lastPetTime = null;
+    if (m.lastPetTime      === undefined) m.lastPetTime      = null;
+    if (m.hasBeenRenamed  === undefined) m.hasBeenRenamed   = false;
     // Apply offline decay before returning
     return applyDecay(m, Date.now());
   } catch {

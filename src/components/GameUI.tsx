@@ -10,6 +10,7 @@ import SettingsPanel from "./SettingsPanel";
 import TrainingModal from "./TrainingModal";
 import DeathScreen from "./DeathScreen";
 import { useGameState } from "@/hooks/useGameState";
+import { checkName } from "@/lib/nameFilter";
 
 const MonsterCanvas = dynamic(() => import("./MonsterCanvas"), { ssr: false });
 
@@ -41,11 +42,30 @@ function EggCountdown({ hatchTime }: { hatchTime: number }) {
 export default function GameUI() {
   const {
     monster, inventory, coins, anim, message, isLoading, showTrain,
-    spawnMonster, useItem, deleteItem, buyItem, pet, clean, train, toggleTrain, wipeAll,
+    spawnMonster, useItem, deleteItem, buyItem, pet, clean, train, toggleTrain, rename, wipeAll,
   } = useGameState();
   const [showBag,      setShowBag]      = useState(false);
   const [showShop,     setShowShop]     = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [renaming,     setRenaming]     = useState(false);
+  const [nameInput,    setNameInput]    = useState("");
+  const [nameError,    setNameError]    = useState("");
+
+  function startRename() {
+    if (!monster) return;
+    setNameInput(monster.name);
+    setNameError("");
+    setRenaming(true);
+  }
+
+  function confirmRename() {
+    if (!monster) return;
+    const check = checkName(nameInput);
+    if (!check.ok) { setNameError(check.reason!); return; }
+    rename(nameInput.trim());
+    setRenaming(false);
+    setNameError("");
+  }
 
   if (isLoading) {
     return (
@@ -153,9 +173,36 @@ export default function GameUI() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <h2 style={{ fontSize: "10px" }} className="text-monster-text uppercase tracking-wide">
-            {monster.name}
-          </h2>
+          {renaming ? (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={nameInput}
+                  onChange={e => { setNameInput(e.target.value); setNameError(""); }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") confirmRename();
+                    if (e.key === "Escape") { setRenaming(false); setNameError(""); }
+                  }}
+                  maxLength={20}
+                  style={{ fontSize: "10px" }}
+                  className="bg-monster-panel border border-monster-border text-monster-text uppercase tracking-wide px-2 py-0.5 w-36 outline-none focus:border-monster-text"
+                />
+                <button onClick={confirmRename} style={{ fontSize: "10px" }} className="text-monster-text hover:text-white transition-colors">✓</button>
+                <button onClick={() => { setRenaming(false); setNameError(""); }} style={{ fontSize: "10px" }} className="text-monster-muted hover:text-monster-text transition-colors">✗</button>
+              </div>
+              {nameError && <p style={{ fontSize: "6px" }} className="text-red-400">{nameError}</p>}
+            </div>
+          ) : (
+            <h2
+              style={{ fontSize: "10px" }}
+              className={`text-monster-text uppercase tracking-wide ${!monster.isDead ? "cursor-pointer hover:opacity-70 transition-opacity" : ""}`}
+              onClick={() => !monster.isDead && startRename()}
+              title={!monster.isDead ? (monster.hasBeenRenamed ? "Rename (requires Name Change item)" : "Click to rename (free)") : undefined}
+            >
+              {monster.name}
+            </h2>
+          )}
           <p style={{ fontSize: "6px" }} className="text-monster-muted flex gap-3">
             <span>Day {monster.age}</span>
             <span>Lv.{monster.rpg.level}</span>
@@ -206,6 +253,7 @@ export default function GameUI() {
       {showShop && (
         <ShopPanel
           coins={coins}
+          hasBeenRenamed={monster.hasBeenRenamed}
           onBuy={buyItem}
           onClose={() => setShowShop(false)}
         />

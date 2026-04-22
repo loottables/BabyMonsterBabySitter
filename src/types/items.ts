@@ -1,4 +1,4 @@
-export type ItemId = "kibble" | "treat" | "energy_drink" | "medicine" | "vaccine";
+export type ItemId = "kibble" | "treat" | "energy_drink" | "medicine" | "vaccine" | "name_change";
 
 export interface InventorySlot {
   itemId: ItemId;
@@ -58,6 +58,17 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     actionLabel: "Use on",
     price:       25,
   },
+  name_change: {
+    id:          "name_change",
+    name:        "Name Change",
+    description: "Allows you to rename your monster. Click the monster's name to use it.",
+    stats:       ["Lets you rename your monster"],
+    actionLabel: "",   // used via name click, not the bag use flow
+    price:       500,
+  },
 };
 
+// Base shop items always available
 export const SHOP_ITEMS: ItemId[] = ["kibble", "treat", "energy_drink", "medicine", "vaccine"];
+// Unlocked in the shop after the first free rename is used
+export const SHOP_ITEMS_EXTENDED: ItemId[] = [...SHOP_ITEMS, "name_change"];

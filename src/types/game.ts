@@ -41,6 +41,7 @@ export interface Monster {
   nextPoopTime: number | null;   // unix ms when the next digested poop appears
   poops: Poop[];
   isShiny: boolean;
+  hasBeenRenamed: boolean;
   isDead: boolean;
   deathTime?: number;
   neglectStart: number | null;
