@@ -37,8 +37,10 @@ export interface Monster {
   lastUpdated: number;    // unix ms — for offline decay
   trainingsToday: number;
   lastTrainingDay: number; // in-game day index
-  lastPoopTime: number;   // unix ms — last automatic poop
+  mealsPending: number;          // meals eaten that haven't produced a poop yet
+  nextPoopTime: number | null;   // unix ms when the next digested poop appears
   poops: Poop[];
+  isShiny: boolean;
   isDead: boolean;
   deathTime?: number;
   neglectStart: number | null;         // when hunger first hit 0

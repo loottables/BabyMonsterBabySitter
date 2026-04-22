@@ -1,7 +1,7 @@
 import type { Monster, RPGStats, Poop, TrainingType } from "@/types/game";
 import {
   GAME_DAY_MS,
-  POOP_INTERVAL_MS,
+  DIGESTION_MS,
   MAX_POOPS,
   HUNGER_DECAY_PER_MIN,
   HAPPINESS_DECAY_PER_MIN,
@@ -15,11 +15,11 @@ import {
   FEED_HAPPINESS_GAIN,
   CLEAN_CLEANLINESS_GAIN,
   CLEAN_HAPPINESS_GAIN,
-  POOP_FEED_CHANCE,
   BASE_EXP_TO_NEXT,
   EXP_SCALE,
   TRAINING_EXERCISES,
   EGG_HATCH_MS,
+  SHINY_CHANCE,
 } from "./constants";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -103,8 +103,10 @@ export function createMonster(): Monster {
     lastUpdated:      t,
     trainingsToday:   0,
     lastTrainingDay:  currentDay,
-    lastPoopTime:     t,
+    mealsPending:     0,
+    nextPoopTime:     null,
     poops:            [],
+    isShiny:          Math.random() < SHINY_CHANCE,
     isDead:           false,
     neglectStart:           null,
     sadStart:               null,
@@ -146,14 +148,19 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
     );
   }
 
-  // Automatic poop accumulation
-  const poopsEarned = Math.floor((toTime - m.lastPoopTime) / POOP_INTERVAL_MS);
-  if (poopsEarned > 0 && m.poops.length < MAX_POOPS) {
-    const toAdd = Math.min(poopsEarned, MAX_POOPS - m.poops.length);
+  // Digestion: produce poops from queued meals
+  if (m.nextPoopTime !== null) {
     const newPoops = [...m.poops];
-    for (let i = 0; i < toAdd; i++) newPoops.push(randomPoopPos());
+    let pending = m.mealsPending;
+    let nextPoop = m.nextPoopTime;
+    while (pending > 0 && nextPoop <= toTime) {
+      if (newPoops.length < MAX_POOPS) newPoops.push(randomPoopPos());
+      pending--;
+      nextPoop = pending > 0 ? nextPoop + DIGESTION_MS : 0;
+    }
     m.poops        = newPoops;
-    m.lastPoopTime = m.lastPoopTime + poopsEarned * POOP_INTERVAL_MS;
+    m.mealsPending = pending;
+    m.nextPoopTime = pending > 0 ? nextPoop : null;
   }
 
   // Training day reset
@@ -226,19 +233,17 @@ export function feedMonster(monster: Monster): ActionResult {
   if (monster.care.hunger >= 98)
     return { ok: false, message: `${monster.name} is already full!` };
 
-  let m = {
+  const t = now();
+  const m = {
     ...monster,
     care: {
       ...monster.care,
       hunger:    clamp(monster.care.hunger    + FEED_HUNGER_GAIN),
       happiness: clamp(monster.care.happiness + FEED_HAPPINESS_GAIN),
     },
+    mealsPending: monster.mealsPending + 1,
+    nextPoopTime: monster.nextPoopTime ?? t + DIGESTION_MS,
   };
-
-  // Chance of poop
-  if (m.poops.length < MAX_POOPS && Math.random() < POOP_FEED_CHANCE) {
-    m = { ...m, poops: [...m.poops, randomPoopPos()] };
-  }
 
   return { ok: true, monster: m, message: `${m.name} munches happily!` };
 }
@@ -327,6 +332,13 @@ export function loadMonster(): Monster | null {
     if (m.rpg.end === undefined) m.rpg.end = 5;
     // Migrate saves created before hunger energy drain tracking
     if (m.lastHungerEnergyDrain === undefined) m.lastHungerEnergyDrain = null;
+    // Migrate saves that used lastPoopTime instead of digestion queue
+    if ((m as unknown as Record<string, unknown>).lastPoopTime !== undefined) {
+      delete (m as unknown as Record<string, unknown>).lastPoopTime;
+    }
+    if (m.mealsPending === undefined) m.mealsPending = 0;
+    if (m.nextPoopTime === undefined) m.nextPoopTime = null;
+    if ((m as unknown as Record<string, unknown>).isShiny === undefined) m.isShiny = false;
     // Apply offline decay before returning
     return applyDecay(m, Date.now());
   } catch {

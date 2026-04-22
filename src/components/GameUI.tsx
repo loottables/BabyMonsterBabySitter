@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import StatsPanel from "./StatsPanel";
 import ActionPanel from "./ActionPanel";
+import BagView from "./BagView";
+import SettingsPanel from "./SettingsPanel";
 import TrainingModal from "./TrainingModal";
 import DeathScreen from "./DeathScreen";
 import { useGameState } from "@/hooks/useGameState";
@@ -37,9 +39,11 @@ function EggCountdown({ hatchTime }: { hatchTime: number }) {
 
 export default function GameUI() {
   const {
-    monster, anim, message, isLoading, showTrain,
-    spawnMonster, feed, clean, train, toggleTrain,
+    monster, inventory, anim, message, isLoading, showTrain,
+    spawnMonster, useItem, deleteItem, clean, train, toggleTrain, wipeAll,
   } = useGameState();
+  const [showBag,      setShowBag]      = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   if (isLoading) {
     return (
@@ -50,6 +54,16 @@ export default function GameUI() {
       </div>
     );
   }
+
+  const settingsBtn = (
+    <button
+      onClick={() => setShowSettings(true)}
+      style={{ fontSize: "6px" }}
+      className="fixed bottom-16 right-4 px-3 py-2 border border-monster-border bg-monster-panel text-monster-muted hover:text-monster-text uppercase tracking-widest transition-colors"
+    >
+      [Settings]
+    </button>
+  );
 
   // ── no monster ────────────────────────────────────────────────────────────
   if (!monster) {
@@ -70,6 +84,15 @@ export default function GameUI() {
         >
           Place Egg
         </button>
+      {settingsBtn}
+      {showSettings && (
+        <SettingsPanel
+          hasMonster={false}
+          onAbandon={spawnMonster}
+          onWipeAll={wipeAll}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
       </div>
     );
   }
@@ -108,18 +131,30 @@ export default function GameUI() {
           />
         </div>
 
-        <button
-          onClick={() => {
-            if (confirm("Abandon this egg? A new egg will start its timer from scratch.")) {
-              spawnMonster();
-            }
-          }}
-          style={{ fontSize: "7px" }}
-          className="text-monster-muted hover:text-monster-text transition-colors mt-2 uppercase tracking-widest"
-        >
-          Abandon Egg
-        </button>
+      {settingsBtn}
+      {showSettings && (
+        <SettingsPanel
+          hasMonster={true}
+          onAbandon={spawnMonster}
+          onWipeAll={wipeAll}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
       </div>
+    );
+  }
+
+  // ── bag view ──────────────────────────────────────────────────────────────
+  if (showBag) {
+    return (
+      <BagView
+        inventory={inventory}
+        monster={monster}
+        message={message}
+        onUse={useItem}
+        onDelete={deleteItem}
+        onClose={() => setShowBag(false)}
+      />
     );
   }
 
@@ -141,15 +176,6 @@ export default function GameUI() {
             {monster.poops.length >= 3    && <span className="animate-pulse">! Dirty</span>}
           </p>
         </div>
-        <button
-          onClick={() => {
-            if (confirm(`Abandon ${monster.name}? You'll receive a new egg.`)) spawnMonster();
-          }}
-          style={{ fontSize: "6px" }}
-          className="text-monster-muted hover:text-monster-text transition-colors px-2 py-1 uppercase tracking-widest"
-        >
-          Abandon
-        </button>
       </div>
 
       {/* Main layout */}
@@ -172,7 +198,7 @@ export default function GameUI() {
 
       <ActionPanel
         monster={monster}
-        onFeed={feed}
+        onBag={() => setShowBag(true)}
         onClean={clean}
         onTrain={toggleTrain}
         message={message}
@@ -184,6 +210,17 @@ export default function GameUI() {
 
       {monster.isDead && (
         <DeathScreen monster={monster} onReset={spawnMonster} />
+      )}
+
+      {settingsBtn}
+
+      {showSettings && (
+        <SettingsPanel
+          hasMonster={!monster.isDead}
+          onAbandon={spawnMonster}
+          onWipeAll={wipeAll}
+          onClose={() => setShowSettings(false)}
+        />
       )}
     </div>
   );

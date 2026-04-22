@@ -31,16 +31,15 @@ function ActionBtn({ label, onClick, disabled, title }: BtnProps) {
 
 interface Props {
   monster:  Monster;
-  onFeed:   () => void;
+  onBag:    () => void;
   onClean:  () => void;
   onTrain:  () => void;
   message:  string;
 }
 
-export default function ActionPanel({ monster, onFeed, onClean, onTrain, message }: Props) {
+export default function ActionPanel({ monster, onBag, onClean, onTrain, message }: Props) {
   const { care, poops, isDead } = monster;
 
-  const canFeed  = !isDead && care.hunger < 98;
   const canClean = !isDead && poops.length > 0;
   const canTrain = !isDead && Math.round(care.energy) >= 1;
 
@@ -56,10 +55,9 @@ export default function ActionPanel({ monster, onFeed, onClean, onTrain, message
 
       <div className="flex justify-center gap-3">
         <ActionBtn
-          label="Feed"
-          onClick={onFeed}
-          disabled={!canFeed}
-          title={canFeed ? "Feed your monster" : "Already full"}
+          label="Bag"
+          onClick={onBag}
+          title="Open bag"
         />
         <ActionBtn
           label={`Clean${poops.length > 0 ? ` (${poops.length})` : ""}`}

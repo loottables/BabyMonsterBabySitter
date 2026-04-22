@@ -2,21 +2,21 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { Monster, TrainingType, AnimationState } from "@/types/game";
+import type { Inventory } from "@/types/items";
 import {
-  createMonster,
-  loadMonster,
-  saveMonster,
-  clearMonster,
-  feedMonster,
-  cleanPoop,
-  trainMonster,
-  applyDecay,
+  createMonster, loadMonster, saveMonster, clearMonster,
+  feedMonster, cleanPoop, trainMonster, applyDecay,
 } from "@/lib/gameEngine";
+import {
+  loadInventory, saveInventory, consumeSlot, deleteSlot,
+  clearInventory, createDefaultInventory,
+} from "@/lib/inventory";
 
-// ── state shape ────────────────────────────────────────────────────────────
+// ── state ──────────────────────────────────────────────────────────────────
 
 interface State {
   monster:   Monster | null;
+  inventory: Inventory;
   anim:      AnimationState;
   message:   string;
   isLoading: boolean;
@@ -26,23 +26,25 @@ interface State {
 // ── actions ────────────────────────────────────────────────────────────────
 
 type Action =
-  | { type: "LOAD";        monster: Monster | null }
-  | { type: "NEW_MONSTER"; monster: Monster }
+  | { type: "LOAD";         monster: Monster | null; inventory: Inventory }
+  | { type: "NEW_MONSTER";  monster: Monster }
   | { type: "TICK" }
-  | { type: "FEED" }
+  | { type: "USE_ITEM";     slotIndex: number }
+  | { type: "DELETE_ITEM";  slotIndex: number }
   | { type: "CLEAN" }
-  | { type: "TRAIN";       exercise: TrainingType }
+  | { type: "TRAIN";        exercise: TrainingType }
   | { type: "TOGGLE_TRAIN_MODAL" }
   | { type: "RESET" }
-  | { type: "SET_ANIM";    anim: AnimationState }
-  | { type: "SET_MSG";     message: string };
+  | { type: "WIPE_ALL" }
+  | { type: "SET_ANIM";     anim: AnimationState }
+  | { type: "SET_MSG";      message: string };
 
 // ── reducer ────────────────────────────────────────────────────────────────
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "LOAD":
-      return { ...state, monster: action.monster, isLoading: false };
+      return { ...state, monster: action.monster, inventory: action.inventory, isLoading: false };
 
     case "NEW_MONSTER":
       return { ...state, monster: action.monster, anim: "idle", message: "" };
@@ -50,48 +52,44 @@ function reducer(state: State, action: Action): State {
     case "TICK": {
       if (!state.monster || state.monster.isDead) return state;
       const m = applyDecay(state.monster, Date.now());
+      return { ...state, monster: m, anim: m.isDead ? "dead" : state.anim };
+    }
+
+    case "USE_ITEM": {
+      if (!state.monster) return { ...state, message: "No monster to feed!" };
+      const result = consumeSlot(state.inventory, action.slotIndex);
+      if (!result) return state;
+      // Apply item effect (kibble → feed)
+      const feedResult = feedMonster(state.monster);
+      if (!feedResult.ok) return { ...state, message: feedResult.message };
+      saveInventory(result.inv);
       return {
         ...state,
-        monster: m,
-        anim: m.isDead ? "dead" : state.anim,
+        monster:   feedResult.monster,
+        inventory: result.inv,
+        anim:      "eating",
+        message:   feedResult.message,
       };
     }
 
-    case "FEED": {
-      if (!state.monster) return state;
-      const result = feedMonster(state.monster);
-      if (!result.ok) return { ...state, message: result.message };
-      return {
-        ...state,
-        monster: result.monster,
-        anim:    "eating",
-        message: result.message,
-      };
+    case "DELETE_ITEM": {
+      const inv = deleteSlot(state.inventory, action.slotIndex);
+      saveInventory(inv);
+      return { ...state, inventory: inv };
     }
 
     case "CLEAN": {
       if (!state.monster) return state;
       const result = cleanPoop(state.monster);
       if (!result.ok) return { ...state, message: result.message };
-      return {
-        ...state,
-        monster: result.monster,
-        anim:    "cleaning",
-        message: result.message,
-      };
+      return { ...state, monster: result.monster, anim: "cleaning", message: result.message };
     }
 
     case "TRAIN": {
       if (!state.monster) return state;
       const result = trainMonster(state.monster, action.exercise);
       if (!result.ok) return { ...state, message: result.message, showTrain: false };
-      return {
-        ...state,
-        monster:   result.monster,
-        anim:      "training",
-        message:   result.message,
-        showTrain: false,
-      };
+      return { ...state, monster: result.monster, anim: "training", message: result.message, showTrain: false };
     }
 
     case "TOGGLE_TRAIN_MODAL":
@@ -100,6 +98,14 @@ function reducer(state: State, action: Action): State {
     case "RESET": {
       clearMonster();
       return { ...state, monster: null, anim: "idle", message: "", showTrain: false };
+    }
+
+    case "WIPE_ALL": {
+      clearMonster();
+      clearInventory();
+      const freshInv = createDefaultInventory();
+      saveInventory(freshInv);
+      return { ...state, monster: null, inventory: freshInv, anim: "idle", message: "", showTrain: false };
     }
 
     case "SET_ANIM":
@@ -115,6 +121,7 @@ function reducer(state: State, action: Action): State {
 
 const INITIAL: State = {
   monster:   null,
+  inventory: Array(9).fill(null),
   anim:      "idle",
   message:   "",
   isLoading: true,
@@ -127,18 +134,19 @@ export function useGameState() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
   const animTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On mount: load from localStorage
+  // On mount: load monster + inventory
   useEffect(() => {
-    const m = loadMonster();
-    dispatch({ type: "LOAD", monster: m });
+    const m   = loadMonster();
+    const inv = loadInventory();
+    dispatch({ type: "LOAD", monster: m, inventory: inv });
   }, []);
 
-  // Persist whenever monster changes
+  // Persist monster whenever it changes
   useEffect(() => {
     if (state.monster) saveMonster(state.monster);
   }, [state.monster]);
 
-  // 1-second tick for decay
+  // 1-second decay tick
   const monsterId   = state.monster?.id;
   const monsterDead = state.monster?.isDead;
   useEffect(() => {
@@ -147,19 +155,13 @@ export function useGameState() {
     return () => clearInterval(id);
   }, [monsterId, monsterDead]);
 
-  // Auto-reset animation back to idle after action finishes
+  // Auto-reset animation back to idle
   useEffect(() => {
     if (state.anim === "idle" || state.anim === "dead") return;
     if (animTimerRef.current) clearTimeout(animTimerRef.current);
-    const duration = state.anim === "eating" ? 1200
-                   : state.anim === "training" ? 1500
-                   : 800;
-    animTimerRef.current = setTimeout(() => {
-      dispatch({ type: "SET_ANIM", anim: "idle" });
-    }, duration);
-    return () => {
-      if (animTimerRef.current) clearTimeout(animTimerRef.current);
-    };
+    const duration = state.anim === "eating" ? 1200 : state.anim === "training" ? 1500 : 800;
+    animTimerRef.current = setTimeout(() => dispatch({ type: "SET_ANIM", anim: "idle" }), duration);
+    return () => { if (animTimerRef.current) clearTimeout(animTimerRef.current); };
   }, [state.anim]);
 
   // Auto-clear message after 3 s
@@ -169,7 +171,7 @@ export function useGameState() {
     return () => clearTimeout(id);
   }, [state.message]);
 
-  // ── public actions ─────────────────────────────────────────────────────
+  // ── public actions ────────────────────────────────────────────────────────
 
   const spawnMonster = useCallback(() => {
     const m = createMonster();
@@ -177,26 +179,28 @@ export function useGameState() {
     dispatch({ type: "NEW_MONSTER", monster: m });
   }, []);
 
-  const feed           = useCallback(() => dispatch({ type: "FEED" }),  []);
-  const clean          = useCallback(() => dispatch({ type: "CLEAN" }), []);
-  const train          = useCallback(
-    (ex: TrainingType) => dispatch({ type: "TRAIN", exercise: ex }),
-    []
-  );
-  const toggleTrain    = useCallback(() => dispatch({ type: "TOGGLE_TRAIN_MODAL" }), []);
-  const reset          = useCallback(() => dispatch({ type: "RESET" }), []);
+  const useItem    = useCallback((i: number) => dispatch({ type: "USE_ITEM",    slotIndex: i }), []);
+  const deleteItem = useCallback((i: number) => dispatch({ type: "DELETE_ITEM", slotIndex: i }), []);
+  const clean      = useCallback(() => dispatch({ type: "CLEAN" }), []);
+  const train      = useCallback((ex: TrainingType) => dispatch({ type: "TRAIN", exercise: ex }), []);
+  const toggleTrain = useCallback(() => dispatch({ type: "TOGGLE_TRAIN_MODAL" }), []);
+  const reset      = useCallback(() => dispatch({ type: "RESET" }), []);
+  const wipeAll    = useCallback(() => dispatch({ type: "WIPE_ALL" }), []);
 
   return {
     monster:    state.monster,
+    inventory:  state.inventory,
     anim:       state.anim,
     message:    state.message,
     isLoading:  state.isLoading,
     showTrain:  state.showTrain,
     spawnMonster,
-    feed,
+    useItem,
+    deleteItem,
     clean,
     train,
     toggleTrain,
     reset,
+    wipeAll,
   };
 }

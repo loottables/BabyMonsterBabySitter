@@ -36,6 +36,63 @@ function drawPoop(ctx: CanvasRenderingContext2D, px: number, py: number) {
   }
 }
 
+interface StarData {
+  gx: number; gy: number; size: number; speed: number; phase: number;
+}
+
+function generateStars(seed: number): StarData[] {
+  let s = seed >>> 0;
+  const rng = () => { s = (Math.imul(s, 1664525) + 1013904223) | 0; return (s >>> 0) / 0x100000000; };
+
+  const stars: StarData[] = [];
+
+  // 4×3 grid with jitter for even coverage (12 stars)
+  const cols = 4, rows = 3;
+  const cellW = 60 / cols, cellH = 60 / rows;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      stars.push({
+        gx:    2 + Math.floor(col * cellW + rng() * cellW),
+        gy:    2 + Math.floor(row * cellH + rng() * cellH),
+        size:  1 + Math.floor(rng() * 3),
+        speed: 0.4 + rng() * 1.8,
+        phase: rng() * Math.PI * 2,
+      });
+    }
+  }
+
+  // 3–4 extra random stars for organic feel
+  const extra = 3 + Math.floor(rng() * 2);
+  for (let i = 0; i < extra; i++) {
+    stars.push({
+      gx:    2 + Math.floor(rng() * 60),
+      gy:    2 + Math.floor(rng() * 60),
+      size:  1 + Math.floor(rng() * 3),
+      speed: 0.4 + rng() * 1.8,
+      phase: rng() * Math.PI * 2,
+    });
+  }
+
+  return stars; // 15–16 total
+}
+
+function drawStar(ctx: CanvasRenderingContext2D, gx: number, gy: number, size: number) {
+  const cx = gx * PIXEL, cy = gy * PIXEL;
+  ctx.fillRect(cx, cy, PIXEL, PIXEL);
+  if (size >= 2) {
+    ctx.fillRect(cx - PIXEL, cy, PIXEL, PIXEL);
+    ctx.fillRect(cx + PIXEL, cy, PIXEL, PIXEL);
+    ctx.fillRect(cx, cy - PIXEL, PIXEL, PIXEL);
+    ctx.fillRect(cx, cy + PIXEL, PIXEL, PIXEL);
+  }
+  if (size >= 3) {
+    ctx.fillRect(cx - 2 * PIXEL, cy, PIXEL, PIXEL);
+    ctx.fillRect(cx + 2 * PIXEL, cy, PIXEL, PIXEL);
+    ctx.fillRect(cx, cy - 2 * PIXEL, PIXEL, PIXEL);
+    ctx.fillRect(cx, cy + 2 * PIXEL, PIXEL, PIXEL);
+  }
+}
+
 function crackCountFromProgress(p: number): number {
   if (p < 0.50) return 0;
   if (p < 0.70) return 1;
@@ -62,7 +119,10 @@ export default function MonsterCanvas({ monster, anim }: Props) {
   const eggCacheRef = useRef<{ count: number; oc: HTMLCanvasElement } | null>(null);
 
   // Monster sprite: regenerated only when seed changes
-  const grid = useMemo(() => generateMonster(monster.seed), [monster.seed]);
+  const grid  = useMemo(() => generateMonster(monster.seed), [monster.seed]);
+  const stars = useMemo(() => generateStars(monster.seed),   [monster.seed]);
+  const starsRef = useRef<StarData[]>(stars);
+  useEffect(() => { starsRef.current = stars; }, [stars]);
 
   useEffect(() => { animRef.current    = anim;    }, [anim]);
   useEffect(() => { monsterRef.current = monster; }, [monster]);
@@ -135,6 +195,17 @@ export default function MonsterCanvas({ monster, anim }: Props) {
       } else if (curAnim === "dead") {
         yOff  = Math.min(30, elapsed / 80);
         alpha = Math.max(0, 1 - elapsed / 2500);
+      }
+
+      // Draw shiny stars behind monster (fixed position, not affected by monster animation)
+      if (m.isShiny) {
+        ctx.fillStyle = "rgb(255,255,255)";
+        for (const star of starsRef.current) {
+          const flicker = (Math.sin(elapsed / 400 * star.speed + star.phase) + 1) / 2;
+          ctx.globalAlpha = 0.1 + flicker * 0.9;
+          drawStar(ctx, star.gx, star.gy, star.size);
+        }
+        ctx.globalAlpha = 1;
       }
 
       ctx.save();

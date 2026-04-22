@@ -190,6 +190,9 @@ function addSatelliteShape(
   }
 }
 
+const BOTTOM_ZONES = new Set<SatZone>(["bottomLeft", "bottomRight"]);
+const ROUND_SAT_SHAPES = new Set<SatShape>(["circle", "oval"]);
+
 function addSatelliteShapes(
   g: PixelGrid,
   attach: Attach,
@@ -197,12 +200,13 @@ function addSatelliteShapes(
   hw: number,
   hh: number,
   rng: RNG,
+  bodyShape: Shape,
 ) {
   // ~55% chance to skip entirely
   if (rng.next() > 0.55) return;
 
-  const satShapes: SatShape[] = ["circle", "rect", "oval", "diamond", "triangle"];
-  const shape = rng.pick(satShapes);
+  // Ghost bottom zones + round shapes = phallic — exclude them
+  const allowedSatShapes: SatShape[] = ["circle", "rect", "oval", "diamond", "triangle"];
 
   // Size: 25–45% of smallest body half-dimension, clamped 3–7
   const maxSize = Math.round(Math.min(hw, hh) * 0.45);
@@ -220,12 +224,22 @@ function addSatelliteShapes(
 
   if (useSymmetric) {
     const [zoneA, zoneB] = rng.pick(pairs);
+    const isBottomPair = BOTTOM_ZONES.has(zoneA) || BOTTOM_ZONES.has(zoneB);
+    const shapes = (bodyShape === "ghost" && isBottomPair)
+      ? allowedSatShapes.filter(s => !ROUND_SAT_SHAPES.has(s))
+      : allowedSatShapes;
+    const shape = rng.pick(shapes);
     addSatelliteShape(g, attach[zoneA], zoneA, shape, size, base);
     addSatelliteShape(g, attach[zoneB], zoneB, shape, size, base);
   } else {
     // Single asymmetric satellite
     const soloZones: SatZone[] = ["topLeft","topRight","bottomLeft","bottomRight","midLeft","midRight"];
     const zone = rng.pick(soloZones);
+    const isBottom = BOTTOM_ZONES.has(zone);
+    const shapes = (bodyShape === "ghost" && isBottom)
+      ? allowedSatShapes.filter(s => !ROUND_SAT_SHAPES.has(s))
+      : allowedSatShapes;
+    const shape = rng.pick(shapes);
     addSatelliteShape(g, attach[zone], zone, shape, size, base);
   }
 }
@@ -260,210 +274,261 @@ interface Attach {
 // ── body shape renderers ───────────────────────────────────────────────────
 
 type Shape = "circle" | "square" | "rect_tall" | "oval" | "diamond" | "ghost" | "blob" | "cloud" | "star4" | "mushroom";
+type SizeMode = "normal" | "small";
 
 interface BodyResult { cx: number; cy: number; hw: number; hh: number; attach: Attach }
 
-function renderBody(g: PixelGrid, shape: Shape, base: number): BodyResult {
-  const cx = 32, cy = 30;
+interface ShapeDrawResult { hw: number; hh: number; faceCy: number; attach: Attach }
+
+// Draws one shape at (cx, cy) in normal or small size. Returns dims + attach points.
+function drawShapeAt(
+  g: PixelGrid, shape: Shape, cx: number, cy: number, mode: SizeMode, base: number,
+): ShapeDrawResult {
+  const sm = mode === "small";
 
   switch (shape) {
     case "circle": {
-      const r = 14;
+      const r = sm ? 9 : 14;
       shadedCircle(g, cx, cy, r, base);
-      return {
-        cx, cy, hw: r, hh: r,
-        attach: {
-          top:         { x: cx,       y: cy - r },
-          topLeft:     { x: cx - 10,  y: cy - 10 },
-          topRight:    { x: cx + 10,  y: cy - 10 },
-          midLeft:     { x: cx - r,   y: cy },
-          midRight:    { x: cx + r,   y: cy },
-          bottomLeft:  { x: cx - 10,  y: cy + 10 },
-          bottomRight: { x: cx + 10,  y: cy + 10 },
-          bottom:      { x: cx,       y: cy + r },
-        },
-      };
+      const o = Math.round(r * 0.71);
+      return { hw: r, hh: r, faceCy: cy, attach: {
+        top:         { x: cx,     y: cy - r },
+        topLeft:     { x: cx - o, y: cy - o },
+        topRight:    { x: cx + o, y: cy - o },
+        midLeft:     { x: cx - r, y: cy },
+        midRight:    { x: cx + r, y: cy },
+        bottomLeft:  { x: cx - o, y: cy + o },
+        bottomRight: { x: cx + o, y: cy + o },
+        bottom:      { x: cx,     y: cy + r },
+      }};
     }
 
     case "square": {
-      const hw = 11, hh = 11;
+      const hw = sm ? 8 : 11, hh = sm ? 8 : 11;
       shadedRect(g, cx - hw, cy - hh, hw * 2, hh * 2, base);
-      return {
-        cx, cy, hw, hh,
-        attach: {
-          top:         { x: cx,       y: cy - hh },
-          topLeft:     { x: cx - hw,  y: cy - hh },
-          topRight:    { x: cx + hw,  y: cy - hh },
-          midLeft:     { x: cx - hw,  y: cy },
-          midRight:    { x: cx + hw,  y: cy },
-          bottomLeft:  { x: cx - hw,  y: cy + hh },
-          bottomRight: { x: cx + hw,  y: cy + hh },
-          bottom:      { x: cx,       y: cy + hh },
-        },
-      };
+      return { hw, hh, faceCy: cy, attach: {
+        top:         { x: cx,          y: cy - hh },
+        topLeft:     { x: cx - hw,     y: cy - hh },
+        topRight:    { x: cx + hw,     y: cy - hh },
+        midLeft:     { x: cx - hw,     y: cy },
+        midRight:    { x: cx + hw,     y: cy },
+        bottomLeft:  { x: cx - hw + 3, y: cy + hh },
+        bottomRight: { x: cx + hw - 3, y: cy + hh },
+        bottom:      { x: cx,          y: cy + hh },
+      }};
     }
 
     case "rect_tall": {
-      const hw = 9, hh = 13;
+      const hw = sm ? 7 : 9, hh = sm ? 9 : 13;
       shadedRect(g, cx - hw, cy - hh, hw * 2, hh * 2, base);
-      return {
-        cx, cy, hw, hh,
-        attach: {
-          top:         { x: cx,       y: cy - hh },
-          topLeft:     { x: cx - hw,  y: cy - hh },
-          topRight:    { x: cx + hw,  y: cy - hh },
-          midLeft:     { x: cx - hw,  y: cy },
-          midRight:    { x: cx + hw,  y: cy },
-          bottomLeft:  { x: cx - hw,  y: cy + hh },
-          bottomRight: { x: cx + hw,  y: cy + hh },
-          bottom:      { x: cx,       y: cy + hh },
-        },
-      };
+      return { hw, hh, faceCy: cy, attach: {
+        top:         { x: cx,          y: cy - hh },
+        topLeft:     { x: cx - hw,     y: cy - hh },
+        topRight:    { x: cx + hw,     y: cy - hh },
+        midLeft:     { x: cx - hw,     y: cy },
+        midRight:    { x: cx + hw,     y: cy },
+        bottomLeft:  { x: cx - hw + 3, y: cy + hh },
+        bottomRight: { x: cx + hw - 3, y: cy + hh },
+        bottom:      { x: cx,          y: cy + hh },
+      }};
     }
 
     case "oval": {
-      const rx = 15, ry = 11;
+      const rx = sm ? 10 : 15, ry = sm ? 7 : 11;
       shadedEllipse(g, cx, cy, rx, ry, base);
-      return {
-        cx, cy, hw: rx, hh: ry,
-        attach: {
-          top:         { x: cx,       y: cy - ry },
-          topLeft:     { x: cx - 11,  y: cy - 8 },
-          topRight:    { x: cx + 11,  y: cy - 8 },
-          midLeft:     { x: cx - rx,  y: cy },
-          midRight:    { x: cx + rx,  y: cy },
-          bottomLeft:  { x: cx - 11,  y: cy + 8 },
-          bottomRight: { x: cx + 11,  y: cy + 8 },
-          bottom:      { x: cx,       y: cy + ry },
-        },
-      };
+      const ox = Math.round(rx * 0.75), oy = Math.round(ry * 0.75);
+      return { hw: rx, hh: ry, faceCy: cy, attach: {
+        top:         { x: cx,      y: cy - ry },
+        topLeft:     { x: cx - ox, y: cy - oy },
+        topRight:    { x: cx + ox, y: cy - oy },
+        midLeft:     { x: cx - rx, y: cy },
+        midRight:    { x: cx + rx, y: cy },
+        bottomLeft:  { x: cx - ox, y: cy + oy },
+        bottomRight: { x: cx + ox, y: cy + oy },
+        bottom:      { x: cx,      y: cy + ry },
+      }};
     }
 
     case "diamond": {
-      const half = 12;
+      const half = sm ? 8 : 12;
       shadedDiamond(g, cx, cy, half, base);
-      return {
-        cx, cy, hw: half, hh: half,
-        attach: {
-          top:         { x: cx,            y: cy - half },
-          topLeft:     { x: cx - half / 2, y: cy - half / 2 },
-          topRight:    { x: cx + half / 2, y: cy - half / 2 },
-          midLeft:     { x: cx - half,     y: cy },
-          midRight:    { x: cx + half,     y: cy },
-          bottomLeft:  { x: cx - half / 2, y: cy + half / 2 },
-          bottomRight: { x: cx + half / 2, y: cy + half / 2 },
-          bottom:      { x: cx,            y: cy + half },
-        },
-      };
+      const h2 = Math.round(half / 2);
+      return { hw: half, hh: half, faceCy: cy, attach: {
+        top:         { x: cx,        y: cy - half },
+        topLeft:     { x: cx - h2,   y: cy - h2 },
+        topRight:    { x: cx + h2,   y: cy - h2 },
+        midLeft:     { x: cx - half, y: cy },
+        midRight:    { x: cx + half, y: cy },
+        bottomLeft:  { x: cx - h2,   y: cy + h2 },
+        bottomRight: { x: cx + h2,   y: cy + h2 },
+        bottom:      { x: cx,        y: cy + half },
+      }};
     }
 
     case "ghost": {
-      // Pacman ghost: round head + rectangular body + 3 scalloped bottom bumps
-      const headR = 11, headCy = cy - 2;
+      const headR   = sm ? 8 : 11;
+      const bodyH   = Math.round(headR * 0.9);
+      const bumpR   = Math.max(2, Math.round(headR * 0.36));
+      const bumpGap = Math.round(headR * 0.64);
+      // Center entire ghost at cy
+      const headCy = Math.round(cy - (bodyH + bumpR - headR) / 2);
+      const bumpY  = headCy + bodyH;
       shadedCircle(g, cx, headCy, headR, base);
-      shadedRect(g, cx - headR, headCy, headR * 2 + 1, 10, base);
-      const bumpY = headCy + 10;
-      shadedCircle(g, cx - 7, bumpY, 4, base);
-      shadedCircle(g, cx,     bumpY, 4, base);
-      shadedCircle(g, cx + 7, bumpY, 4, base);
-      return {
-        cx, cy: headCy, hw: headR, hh: headR,
-        attach: {
-          top:         { x: cx,          y: headCy - headR },
-          topLeft:     { x: cx - 8,      y: headCy - 8 },
-          topRight:    { x: cx + 8,      y: headCy - 8 },
-          midLeft:     { x: cx - headR,  y: headCy + 2 },
-          midRight:    { x: cx + headR,  y: headCy + 2 },
-          bottomLeft:  { x: cx - 7,      y: bumpY + 4 },
-          bottomRight: { x: cx + 7,      y: bumpY + 4 },
-          bottom:      { x: cx,          y: bumpY + 4 },
-        },
-      };
+      shadedRect(g, cx - headR, headCy, headR * 2 + 1, bodyH, base);
+      shadedCircle(g, cx - bumpGap, bumpY, bumpR, base);
+      shadedCircle(g, cx,           bumpY, bumpR, base);
+      shadedCircle(g, cx + bumpGap, bumpY, bumpR, base);
+      const topY = headCy - headR;
+      const botY = bumpY + bumpR;
+      const hh   = Math.round((botY - topY) / 2);
+      const tl   = Math.round(headR * 0.7);
+      return { hw: headR, hh, faceCy: headCy, attach: {
+        top:         { x: cx,           y: topY },
+        topLeft:     { x: cx - tl,      y: headCy - tl },
+        topRight:    { x: cx + tl,      y: headCy - tl },
+        midLeft:     { x: cx - headR,   y: headCy },
+        midRight:    { x: cx + headR,   y: headCy },
+        bottomLeft:  { x: cx - bumpGap, y: botY },
+        bottomRight: { x: cx + bumpGap, y: botY },
+        bottom:      { x: cx,           y: botY },
+      }};
     }
 
     case "blob": {
-      // Organic blob: center circle + 4 surrounding bulges
-      shadedCircle(g, cx,     cy,     9, base);
-      shadedCircle(g, cx - 7, cy - 5, 6, base);
-      shadedCircle(g, cx + 7, cy - 5, 6, base);
-      shadedCircle(g, cx - 8, cy + 5, 6, base);
-      shadedCircle(g, cx + 8, cy + 5, 6, base);
-      return {
-        cx, cy, hw: 14, hh: 11,
-        attach: {
-          top:         { x: cx,       y: cy - 11 },
-          topLeft:     { x: cx - 11,  y: cy - 8 },
-          topRight:    { x: cx + 11,  y: cy - 8 },
-          midLeft:     { x: cx - 14,  y: cy },
-          midRight:    { x: cx + 14,  y: cy },
-          bottomLeft:  { x: cx - 11,  y: cy + 9 },
-          bottomRight: { x: cx + 11,  y: cy + 9 },
-          bottom:      { x: cx,       y: cy + 11 },
-        },
-      };
+      const cr = sm ? 6 : 9;
+      const br = sm ? 4 : 6;
+      const bx = sm ? 5 : 7, by = sm ? 4 : 5;
+      shadedCircle(g, cx,      cy,      cr, base);
+      shadedCircle(g, cx - bx, cy - by, br, base);
+      shadedCircle(g, cx + bx, cy - by, br, base);
+      shadedCircle(g, cx - bx, cy + by, br, base);
+      shadedCircle(g, cx + bx, cy + by, br, base);
+      const hw = bx + br, hh = by + br;
+      const ox = Math.round(hw * 0.8), oy = Math.round(hh * 0.75);
+      return { hw, hh, faceCy: cy, attach: {
+        top:         { x: cx,      y: cy - hh },
+        topLeft:     { x: cx - ox, y: cy - oy },
+        topRight:    { x: cx + ox, y: cy - oy },
+        midLeft:     { x: cx - hw, y: cy },
+        midRight:    { x: cx + hw, y: cy },
+        bottomLeft:  { x: cx - ox, y: cy + oy },
+        bottomRight: { x: cx + ox, y: cy + oy },
+        bottom:      { x: cx,      y: cy + hh },
+      }};
     }
 
     case "cloud": {
-      // Cloud: bumpy top (3 circles) + flat rectangular base
-      const baseTop = cy - 2;
-      shadedRect(g, cx - 13, baseTop, 27, 7, base);
-      shadedCircle(g, cx - 8, baseTop,     6, base);
-      shadedCircle(g, cx,     baseTop - 4, 8, base);
-      shadedCircle(g, cx + 8, baseTop,     6, base);
-      return {
-        cx, cy: baseTop - 1, hw: 14, hh: 11,
-        attach: {
-          top:         { x: cx,       y: baseTop - 12 },
-          topLeft:     { x: cx - 12,  y: baseTop - 4 },
-          topRight:    { x: cx + 12,  y: baseTop - 4 },
-          midLeft:     { x: cx - 13,  y: baseTop },
-          midRight:    { x: cx + 13,  y: baseTop },
-          bottomLeft:  { x: cx - 9,   y: baseTop + 5 },
-          bottomRight: { x: cx + 9,   y: baseTop + 5 },
-          bottom:      { x: cx,       y: baseTop + 5 },
-        },
-      };
+      const baseH   = sm ? 5  : 7;
+      const bigR    = sm ? 6  : 8;
+      const sideR   = sm ? 4  : 6;
+      const sideOff = sm ? 6  : 8;
+      const hw      = sm ? 10 : 13;
+      const baseTop = Math.round(cy - baseH / 2);
+      const baseBot = baseTop + baseH;
+      const bigCy   = baseTop;
+      const bigOff  = Math.round(bigR * 0.4);
+      shadedRect(g, cx - hw, baseTop, hw * 2, baseH, base);
+      shadedCircle(g, cx - sideOff, bigCy,          sideR, base);
+      shadedCircle(g, cx,           bigCy - bigOff, bigR,  base);
+      shadedCircle(g, cx + sideOff, bigCy,          sideR, base);
+      const topY = bigCy - bigOff - bigR;
+      const hh   = Math.round((baseBot - topY) / 2);
+      return { hw, hh, faceCy: Math.round(bigCy - bigOff * 0.5), attach: {
+        top:         { x: cx,                      y: topY },
+        topLeft:     { x: cx - Math.round(hw*0.8), y: bigCy - Math.round(bigR*0.5) },
+        topRight:    { x: cx + Math.round(hw*0.8), y: bigCy - Math.round(bigR*0.5) },
+        midLeft:     { x: cx - hw,                 y: baseTop },
+        midRight:    { x: cx + hw,                 y: baseTop },
+        bottomLeft:  { x: cx - Math.round(hw*0.7), y: baseBot },
+        bottomRight: { x: cx + Math.round(hw*0.7), y: baseBot },
+        bottom:      { x: cx,                      y: baseBot },
+      }};
     }
 
     case "star4": {
-      // 4-pointed star: union of horizontal + vertical ellipses
-      shadedEllipse(g, cx, cy, 14,  5, base);
-      shadedEllipse(g, cx, cy,  5, 14, base);
-      return {
-        cx, cy, hw: 7, hh: 7,
-        attach: {
-          top:         { x: cx,      y: cy - 14 },
-          topLeft:     { x: cx - 4,  y: cy - 6 },
-          topRight:    { x: cx + 4,  y: cy - 6 },
-          midLeft:     { x: cx - 14, y: cy },
-          midRight:    { x: cx + 14, y: cy },
-          bottomLeft:  { x: cx - 4,  y: cy + 6 },
-          bottomRight: { x: cx + 4,  y: cy + 6 },
-          bottom:      { x: cx,      y: cy + 14 },
-        },
-      };
+      const hx = sm ? 10 : 14, hy = sm ? 4 : 5;
+      const vx = sm ? 4  : 5,  vy = sm ? 10 : 14;
+      shadedEllipse(g, cx, cy, hx, hy, base);
+      shadedEllipse(g, cx, cy, vx, vy, base);
+      const o = sm ? 3 : 4;
+      return { hw: sm ? 6 : 7, hh: sm ? 6 : 7, faceCy: cy, attach: {
+        top:         { x: cx,      y: cy - vy },
+        topLeft:     { x: cx - o,  y: cy - o },
+        topRight:    { x: cx + o,  y: cy - o },
+        midLeft:     { x: cx - hx, y: cy },
+        midRight:    { x: cx + hx, y: cy },
+        bottomLeft:  { x: cx - o,  y: cy + o },
+        bottomRight: { x: cx + o,  y: cy + o },
+        bottom:      { x: cx,      y: cy + vy },
+      }};
     }
 
     case "mushroom": {
-      // Mushroom: wide ellipse cap + narrow rectangular stem
-      const capRx = 14, capRy = 9, capCy = cy - 4;
+      const capRx  = sm ? 10 : 14, capRy = sm ? 6 : 9;
+      const stemW  = sm ? 4  : 6,  stemH = sm ? 6 : 9;
+      const capCy  = Math.round(cy - stemH / 2);
+      const stemTop = capCy + Math.round(capRy * 0.5);
       shadedEllipse(g, cx, capCy, capRx, capRy, base);
-      shadedRect(g, cx - 3, cy + 5, 7, 9, base);
-      return {
-        cx, cy: capCy + 1, hw: capRx, hh: capRy,
-        attach: {
-          top:         { x: cx,         y: capCy - capRy },
-          topLeft:     { x: cx - 10,    y: capCy - 6 },
-          topRight:    { x: cx + 10,    y: capCy - 6 },
-          midLeft:     { x: cx - capRx, y: capCy },
-          midRight:    { x: cx + capRx, y: capCy },
-          bottomLeft:  { x: cx - 3,     y: cy + 14 },
-          bottomRight: { x: cx + 3,     y: cy + 14 },
-          bottom:      { x: cx,         y: cy + 14 },
-        },
-      };
+      shadedRect(g, cx - Math.floor(stemW / 2), stemTop, stemW, stemH, base);
+      const topY = capCy - capRy;
+      const botY = stemTop + stemH;
+      const hh   = Math.round((botY - topY) / 2);
+      const half = Math.floor(stemW / 2);
+      return { hw: capRx, hh, faceCy: capCy, attach: {
+        top:         { x: cx,                         y: topY },
+        topLeft:     { x: cx - Math.round(capRx*0.7), y: capCy - Math.round(capRy*0.7) },
+        topRight:    { x: cx + Math.round(capRx*0.7), y: capCy - Math.round(capRy*0.7) },
+        midLeft:     { x: cx - capRx,                 y: capCy },
+        midRight:    { x: cx + capRx,                 y: capCy },
+        bottomLeft:  { x: cx - half + 1, y: botY },
+        bottomRight: { x: cx + half - 1, y: botY },
+        bottom:      { x: cx,                         y: botY },
+      }};
     }
   }
+}
+
+// Lays out 1 or 2 shapes vertically, returns face-center (cx/cy/hw/hh) + combined attach.
+function renderBody(
+  g:      PixelGrid,
+  shape1: Shape,
+  shape2: Shape | null,
+  base:   number,
+): BodyResult {
+  const cx = 32;
+
+  if (shape2 === null) {
+    const r = drawShapeAt(g, shape1, cx, 30, "normal", base);
+    return { cx, cy: r.faceCy, hw: r.hw, hh: r.hh, attach: r.attach };
+  }
+
+  // Measure half-heights via scratch so we can compute stack positions
+  const scratch = new Uint8Array(W * W);
+  const hh1 = drawShapeAt(scratch, shape1, cx, 30, "small", base).hh;
+  const hh2 = drawShapeAt(scratch, shape2, cx, 30, "small", base).hh;
+
+  // Negative value = overlap, so shapes fuse into one connected silhouette
+  const GAP = -4;
+  // combined center Y = cy1 + hh2 + GAP/2 → set to 30
+  const cy1 = Math.round(30 - hh2 - GAP / 2);
+  const cy2 = cy1 + hh1 + GAP + hh2;
+
+  const r1 = drawShapeAt(g, shape1, cx, cy1, "small", base);
+  const r2 = drawShapeAt(g, shape2, cx, cy2, "small", base);
+
+  // Top shape owns the face, ears, horns; bottom shape owns legs; widest gets arms
+  const attach: Attach = {
+    top:         r1.attach.top,
+    topLeft:     r1.attach.topLeft,
+    topRight:    r1.attach.topRight,
+    midLeft:     r1.hw >= r2.hw ? r1.attach.midLeft  : r2.attach.midLeft,
+    midRight:    r1.hw >= r2.hw ? r1.attach.midRight : r2.attach.midRight,
+    bottomLeft:  r2.attach.bottomLeft,
+    bottomRight: r2.attach.bottomRight,
+    bottom:      r2.attach.bottom,
+  };
+
+  return { cx, cy: r1.faceCy, hw: Math.max(r1.hw, r2.hw), hh: r1.hh, attach };
 }
 
 // ── anime-style eyes ───────────────────────────────────────────────────────
@@ -580,10 +645,14 @@ function addEyes(
   hw: number, hh: number,
   style: EyeStyle,
 ) {
-  // Radius scales with face size: 3–5 px
-  const r      = Math.max(3, Math.min(5, Math.round(Math.min(hw, hh) * 0.30)));
-  // Spread ensures a comfortable gap between the two eyes
-  const spread = Math.max(r + 3, Math.round(hw * 0.42));
+  // Radius: 25% of min face dimension, clamped 2–4
+  const r = Math.max(2, Math.min(4, Math.round(Math.min(hw, hh) * 0.25)));
+  // The "wide" style adds 2px to rx — account for it when clamping spread
+  const maxRx = style === "wide" ? r + 2 : r;
+  // Outer eye edge must stay within body: spread + maxRx ≤ hw - 2
+  const maxSpread = hw - maxRx - 2;
+  const idealSpread = Math.round(hw * 0.38);
+  const spread = Math.min(maxSpread, Math.max(r + 2, idealSpread));
   const eyeY   = cy - Math.round(hh * 0.15);
 
   drawOneEye(g, cx - spread, eyeY, r, style, "left");
@@ -694,20 +763,21 @@ function addEar(
 
   switch (style) {
     case "pointy":
-      // 2-px wide base tapering to a point
-      fillRect(g, p.x - 1, p.y - 2, 3, 2, col);
-      fillRect(g, p.x,     p.y - 4, 2, 2, col);
-      set(g, p.x + (s > 0 ? 1 : 0), p.y - 5, dark);
+      // 4-px wide base tapering to a point
+      fillRect(g, p.x - 2, p.y - 2, 4, 2, col);
+      fillRect(g, p.x - 1, p.y - 4, 3, 2, col);
+      fillRect(g, p.x,     p.y - 6, 2, 2, col);
+      set(g, p.x + (s > 0 ? 1 : 0), p.y - 7, dark);
       break;
 
     case "round":
-      fillCircle(g, p.x + s * 2, p.y - 3, 4, col);
+      fillCircle(g, p.x + s * 2, p.y - 3, 5, col);
       break;
 
     case "floppy": {
-      // droopy ear — 3px thick horizontal then drops down
-      fillRect(g, p.x + Math.min(0, s * 4), p.y - 1, 5, 3, col);
-      fillRect(g, p.x + s * 3,              p.y + 1,  3, 4, col);
+      // droopy ear — 4px thick horizontal then drops down
+      fillRect(g, p.x + Math.min(0, s * 4), p.y - 2, 6, 4, col);
+      fillRect(g, p.x + s * 3,              p.y + 1,  4, 5, col);
       break;
     }
   }
@@ -716,39 +786,45 @@ function addEar(
 type AntennaStyle = "ball" | "fork" | "star";
 
 function addAntenna(g: PixelGrid, p: Pt, style: AntennaStyle, col: number) {
-  // 2-px wide stem
+  // 3-px wide stem
   for (let i = 1; i <= 5; i++) {
+    set(g, p.x - 1, p.y - i, col);
     set(g, p.x,     p.y - i, col);
     set(g, p.x + 1, p.y - i, col);
   }
 
   switch (style) {
     case "ball":
-      fillCircle(g, p.x, p.y - 7, 3, col);
+      fillCircle(g, p.x, p.y - 8, 4, col);
       break;
     case "fork":
-      // each prong is 2px wide
+      // each prong is 3px wide
       for (let i = 0; i < 4; i++) {
         set(g, p.x - 1 - i, p.y - 6 - i, col);
         set(g, p.x - 2 - i, p.y - 6 - i, col);
+        set(g, p.x - 3 - i, p.y - 6 - i, col);
         set(g, p.x + 2 + i, p.y - 6 - i, col);
         set(g, p.x + 3 + i, p.y - 6 - i, col);
+        set(g, p.x + 4 + i, p.y - 6 - i, col);
       }
       break;
     case "star":
-      fillCircle(g, p.x, p.y - 7, 2, col);
-      set(g, p.x - 2, p.y - 7, col); set(g, p.x + 3, p.y - 7, col);
-      set(g, p.x,     p.y - 9, col); set(g, p.x + 1, p.y - 9, col);
+      fillCircle(g, p.x, p.y - 8, 3, col);
+      set(g, p.x - 3, p.y - 8, col); set(g, p.x + 3, p.y - 8, col);
+      set(g, p.x - 2, p.y - 8, col); set(g, p.x + 2, p.y - 8, col);
+      set(g, p.x,     p.y - 11, col); set(g, p.x + 1, p.y - 11, col);
+      set(g, p.x,     p.y - 10, col); set(g, p.x + 1, p.y - 10, col);
       break;
   }
 }
 
 function addHorn(g: PixelGrid, p: Pt, side: "left" | "right", col: number) {
   const dark = Math.max(2, col - 40);
-  // 2-px wide base tapering to tip
-  fillRect(g, p.x - 1, p.y - 2, 3, 2, col);
-  fillRect(g, p.x - 1, p.y - 4, 2, 2, col);
-  set(g, p.x,          p.y - 5, dark);
+  // 4-px wide base tapering to tip
+  fillRect(g, p.x - 2, p.y - 2, 4, 2, col);
+  fillRect(g, p.x - 1, p.y - 4, 3, 2, col);
+  fillRect(g, p.x - 1, p.y - 6, 2, 2, col);
+  set(g, p.x,          p.y - 7, dark);
 }
 
 type ArmStyle = "stubby" | "claw" | "long" | "wing";
@@ -759,41 +835,47 @@ function addArm(g: PixelGrid, p: Pt, side: "left" | "right", style: ArmStyle, co
 
   switch (style) {
     case "stubby":
-      // 3-px wide nub
-      fillRect(g, p.x + (s > 0 ? 1 : -3), p.y - 1, 3, 3, col);
+      // Round fist extending sideways
+      fillCircle(g, p.x + s * 4, p.y, 3, col);
       break;
 
     case "claw": {
-      // 2-px tall arm shaft + 2-px claw tips
-      for (let i = 1; i <= 4; i++) {
+      // 3-px tall arm shaft + pointed claw tips
+      for (let i = 1; i <= 5; i++) {
         set(g, p.x + s * i, p.y - 1, col);
         set(g, p.x + s * i, p.y,     col);
+        set(g, p.x + s * i, p.y + 1, col);
       }
-      set(g, p.x + s * 4, p.y - 2, dark); set(g, p.x + s * 5, p.y - 2, dark);
-      set(g, p.x + s * 4, p.y + 1, dark); set(g, p.x + s * 5, p.y + 2, dark);
+      // Round palm with claw tips
+      fillCircle(g, p.x + s * 6, p.y, 2, col);
+      set(g, p.x + s * 7, p.y - 2, dark);
+      set(g, p.x + s * 7, p.y,     dark);
+      set(g, p.x + s * 7, p.y + 2, dark);
       break;
     }
 
     case "long": {
-      // 2-px tall upper arm extending sideways
-      for (let i = 1; i <= 4; i++) {
+      // 3-px tall upper arm extending sideways
+      for (let i = 1; i <= 5; i++) {
         set(g, p.x + s * i, p.y - 1, col);
         set(g, p.x + s * i, p.y,     col);
+        set(g, p.x + s * i, p.y + 1, col);
       }
-      // 2-px wide forearm going down
-      for (let i = 1; i <= 4; i++) {
+      // 3-px wide forearm going down
+      for (let i = 1; i <= 5; i++) {
+        set(g, p.x + s * 5, p.y + i, col);
         set(g, p.x + s * 4, p.y + i, col);
         set(g, p.x + s * 3, p.y + i, col);
       }
-      // 3-px hand
-      fillRect(g, p.x + s * 2, p.y + 4, 3, 2, col);
+      // Round hand at forearm end
+      fillCircle(g, p.x + s * 4, p.y + 6, 3, col);
       break;
     }
 
     case "wing": {
-      // filled triangular wing — at least 2px wide at every row
-      for (let i = 0; i < 6; i++) {
-        const wh = Math.max(2, 5 - i);
+      // filled triangular wing — at least 3px wide at every row
+      for (let i = 0; i < 7; i++) {
+        const wh = Math.max(3, 6 - i);
         for (let j = 0; j < wh; j++)
           set(g, p.x + s * (i + 1), p.y - j, col);
       }
@@ -810,59 +892,64 @@ function addLeg(g: PixelGrid, p: Pt, side: "left" | "right", style: LegStyle, co
 
   switch (style) {
     case "stubby":
-      // 3-px wide short leg
-      fillRect(g, p.x - 1, p.y + 1, 3, 3, col);
+      // 5-px wide nub starting AT attach point so it overlaps body
+      fillRect(g, p.x - 2, p.y, 5, 5, col);
       break;
 
     case "long":
-      // 2-px wide shaft
-      for (let i = 1; i <= 5; i++) {
+      // 3-px wide shaft starting AT attach point
+      for (let i = 0; i <= 6; i++) {
+        set(g, p.x - 1, p.y + i, col);
         set(g, p.x,     p.y + i, col);
         set(g, p.x + 1, p.y + i, col);
       }
-      // 3-px wide foot
-      fillRect(g, p.x - 1, p.y + 5, 4, 2, dark);
+      // 5-px wide foot
+      fillRect(g, p.x - 2, p.y + 6, 6, 3, dark);
       break;
 
     case "paw":
-      // 2-px wide shin
-      for (let i = 1; i <= 4; i++) {
+      // 3-px wide shin starting AT attach point
+      for (let i = 0; i <= 5; i++) {
+        set(g, p.x - 1, p.y + i, col);
         set(g, p.x,     p.y + i, col);
         set(g, p.x + 1, p.y + i, col);
       }
-      // 3 toes
-      fillRect(g, p.x - 1, p.y + 5, 4, 2, col);
+      // 3 wider toes
+      fillRect(g, p.x - 3, p.y + 5, 3, 3, col);
+      fillRect(g, p.x - 1, p.y + 5, 3, 3, col);
+      fillRect(g, p.x + 1, p.y + 5, 3, 3, col);
       break;
   }
 }
 
 function addTail(g: PixelGrid, p: Pt, col: number, rng: RNG) {
   const curl = rng.nextInt(0, 1);
-  // 2-px wide diagonal tail base
-  fillRect(g, p.x + 1, p.y - 1, 2, 2, col);
-  fillRect(g, p.x + 2, p.y - 2, 2, 2, col);
-  fillRect(g, p.x + 3, p.y - 3, 2, 2, col);
+  // 3-px wide diagonal tail base
+  fillRect(g, p.x + 1, p.y - 1, 3, 3, col);
+  fillRect(g, p.x + 3, p.y - 3, 3, 3, col);
+  fillRect(g, p.x + 5, p.y - 5, 3, 3, col);
   if (curl === 0) {
     // curl back
-    fillRect(g, p.x + 4, p.y - 3, 2, 2, col);
-    fillRect(g, p.x + 5, p.y - 2, 2, 2, col);
-    fillRect(g, p.x + 5, p.y - 1, 2, 2, col);
+    fillRect(g, p.x + 7, p.y - 5, 3, 3, col);
+    fillRect(g, p.x + 8, p.y - 3, 3, 3, col);
+    fillRect(g, p.x + 8, p.y - 1, 3, 3, col);
   } else {
     // straight tip
-    fillRect(g, p.x + 4, p.y - 4, 2, 2, col);
-    fillRect(g, p.x + 5, p.y - 5, 2, 2, col);
+    fillRect(g, p.x + 7, p.y - 7, 3, 3, col);
+    fillRect(g, p.x + 9, p.y - 9, 3, 3, col);
   }
 }
 
 function addSpikes(g: PixelGrid, cx: number, cy: number, hh: number, count: number, col: number) {
   const dark = Math.max(2, col - 50);
   for (let i = 0; i < count; i++) {
-    const sx = cx - 8 + i * 5;
+    const sx = cx - 9 + i * 6;
     const sy = cy - hh;
-    // 2-px wide spike tapering to a point
-    fillRect(g, sx, sy - 1, 2, 2, dark);
-    fillRect(g, sx, sy - 3, 2, 2, dark);
-    set(g,         sx,     sy - 4, dark);
+    // 3-px wide spike tapering to a point
+    fillRect(g, sx, sy - 1, 3, 2, dark);
+    fillRect(g, sx, sy - 3, 3, 2, dark);
+    fillRect(g, sx, sy - 5, 2, 2, dark);
+    set(g,     sx, sy - 6, dark);
   }
 }
 
@@ -873,16 +960,21 @@ export function generateMonster(seed: number): PixelGrid {
   const rng = makeRng(seed);
 
   const shapes: Shape[] = ["circle", "square", "rect_tall", "oval", "diamond", "ghost", "blob", "cloud", "star4", "mushroom"];
-  const shape = rng.pick(shapes);
+  const shape1 = rng.pick(shapes);
+  // 70% chance of a second body shape stacked below
+  const shape2: Shape | null = rng.nextBool(0.7)
+    ? (rng.nextBool(0.4) ? shape1 : rng.pick(shapes))
+    : null;
 
   // Body color: 90–185
   const base = 90 + rng.nextInt(0, 95);
   const dark = Math.max(15, base - 55);
 
-  const { cx, cy, hw, hh, attach } = renderBody(g, shape, base);
+  const { cx, cy, hw, hh, attach } = renderBody(g, shape1, shape2, base);
 
   // Satellite shapes fuse with the body before outlining
-  addSatelliteShapes(g, attach, base, hw, hh, rng);
+  // Pass the bottom shape for the ghost-bottom phallic check
+  addSatelliteShapes(g, attach, base, hw, hh, rng, shape2 ?? shape1);
 
   // Outline pass
   outlineBody(g, dark);
