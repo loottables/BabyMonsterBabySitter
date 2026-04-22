@@ -2,21 +2,24 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { Monster, TrainingType, AnimationState } from "@/types/game";
-import type { Inventory } from "@/types/items";
+import type { Inventory, ItemId } from "@/types/items";
 import {
   createMonster, loadMonster, saveMonster, clearMonster,
-  feedMonster, cleanPoop, trainMonster, applyDecay,
+  cleanPoop, trainMonster, petMonster, applyDecay, applyItem,
 } from "@/lib/gameEngine";
 import {
   loadInventory, saveInventory, consumeSlot, deleteSlot,
-  clearInventory, createDefaultInventory,
+  clearInventory, createDefaultInventory, addToInventory,
 } from "@/lib/inventory";
+import { loadCoins, saveCoins, clearCoins } from "@/lib/coins";
+import { STARTING_COINS } from "@/lib/constants";
 
 // ── state ──────────────────────────────────────────────────────────────────
 
 interface State {
   monster:   Monster | null;
   inventory: Inventory;
+  coins:     number;
   anim:      AnimationState;
   message:   string;
   isLoading: boolean;
@@ -26,11 +29,13 @@ interface State {
 // ── actions ────────────────────────────────────────────────────────────────
 
 type Action =
-  | { type: "LOAD";         monster: Monster | null; inventory: Inventory }
+  | { type: "LOAD";         monster: Monster | null; inventory: Inventory; coins: number }
   | { type: "NEW_MONSTER";  monster: Monster }
   | { type: "TICK" }
   | { type: "USE_ITEM";     slotIndex: number }
   | { type: "DELETE_ITEM";  slotIndex: number }
+  | { type: "BUY_ITEM";    itemId: ItemId; price: number }
+  | { type: "PET" }
   | { type: "CLEAN" }
   | { type: "TRAIN";        exercise: TrainingType }
   | { type: "TOGGLE_TRAIN_MODAL" }
@@ -44,7 +49,7 @@ type Action =
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "LOAD":
-      return { ...state, monster: action.monster, inventory: action.inventory, isLoading: false };
+      return { ...state, monster: action.monster, inventory: action.inventory, coins: action.coins, isLoading: false };
 
     case "NEW_MONSTER":
       return { ...state, monster: action.monster, anim: "idle", message: "" };
@@ -56,26 +61,43 @@ function reducer(state: State, action: Action): State {
     }
 
     case "USE_ITEM": {
-      if (!state.monster) return { ...state, message: "No monster to feed!" };
+      if (!state.monster) return { ...state, message: "No monster!" };
       const result = consumeSlot(state.inventory, action.slotIndex);
       if (!result) return state;
-      // Apply item effect (kibble → feed)
-      const feedResult = feedMonster(state.monster);
-      if (!feedResult.ok) return { ...state, message: feedResult.message };
+      const itemResult = applyItem(state.monster, result.itemId);
+      if (!itemResult.ok) return { ...state, message: itemResult.message };
       saveInventory(result.inv);
+      const anim = result.itemId === "kibble" ? "eating"
+                 : result.itemId === "treat"   ? "happy"
+                 : "happy";
       return {
         ...state,
-        monster:   feedResult.monster,
+        monster:   itemResult.monster,
         inventory: result.inv,
-        anim:      "eating",
-        message:   feedResult.message,
+        anim,
+        message:   itemResult.message,
       };
+    }
+
+    case "BUY_ITEM": {
+      if (state.coins < action.price) return { ...state, message: "Not enough coins!" };
+      const inv = addToInventory(state.inventory, action.itemId);
+      if (!inv) return { ...state, message: "Bag is full!" };
+      saveInventory(inv);
+      return { ...state, inventory: inv, coins: state.coins - action.price };
     }
 
     case "DELETE_ITEM": {
       const inv = deleteSlot(state.inventory, action.slotIndex);
       saveInventory(inv);
       return { ...state, inventory: inv };
+    }
+
+    case "PET": {
+      if (!state.monster) return state;
+      const result = petMonster(state.monster);
+      if (!result.ok) return { ...state, message: result.message };
+      return { ...state, monster: result.monster, anim: "happy", message: result.message };
     }
 
     case "CLEAN": {
@@ -103,9 +125,10 @@ function reducer(state: State, action: Action): State {
     case "WIPE_ALL": {
       clearMonster();
       clearInventory();
+      clearCoins();
       const freshInv = createDefaultInventory();
       saveInventory(freshInv);
-      return { ...state, monster: null, inventory: freshInv, anim: "idle", message: "", showTrain: false };
+      return { ...state, monster: null, inventory: freshInv, coins: STARTING_COINS, anim: "idle", message: "", showTrain: false };
     }
 
     case "SET_ANIM":
@@ -122,6 +145,7 @@ function reducer(state: State, action: Action): State {
 const INITIAL: State = {
   monster:   null,
   inventory: Array(9).fill(null),
+  coins:     STARTING_COINS,
   anim:      "idle",
   message:   "",
   isLoading: true,
@@ -134,17 +158,23 @@ export function useGameState() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
   const animTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On mount: load monster + inventory
+  // On mount: load monster + inventory + coins
   useEffect(() => {
     const m   = loadMonster();
     const inv = loadInventory();
-    dispatch({ type: "LOAD", monster: m, inventory: inv });
+    const c   = loadCoins();
+    dispatch({ type: "LOAD", monster: m, inventory: inv, coins: c });
   }, []);
 
   // Persist monster whenever it changes
   useEffect(() => {
     if (state.monster) saveMonster(state.monster);
   }, [state.monster]);
+
+  // Persist coins and broadcast to header display
+  useEffect(() => {
+    if (!state.isLoading) saveCoins(state.coins);
+  }, [state.coins, state.isLoading]);
 
   // 1-second decay tick
   const monsterId   = state.monster?.id;
@@ -181,6 +211,8 @@ export function useGameState() {
 
   const useItem    = useCallback((i: number) => dispatch({ type: "USE_ITEM",    slotIndex: i }), []);
   const deleteItem = useCallback((i: number) => dispatch({ type: "DELETE_ITEM", slotIndex: i }), []);
+  const buyItem    = useCallback((itemId: ItemId, price: number) => dispatch({ type: "BUY_ITEM", itemId, price }), []);
+  const pet        = useCallback(() => dispatch({ type: "PET" }), []);
   const clean      = useCallback(() => dispatch({ type: "CLEAN" }), []);
   const train      = useCallback((ex: TrainingType) => dispatch({ type: "TRAIN", exercise: ex }), []);
   const toggleTrain = useCallback(() => dispatch({ type: "TOGGLE_TRAIN_MODAL" }), []);
@@ -190,6 +222,7 @@ export function useGameState() {
   return {
     monster:    state.monster,
     inventory:  state.inventory,
+    coins:      state.coins,
     anim:       state.anim,
     message:    state.message,
     isLoading:  state.isLoading,
@@ -197,6 +230,8 @@ export function useGameState() {
     spawnMonster,
     useItem,
     deleteItem,
+    buyItem,
+    pet,
     clean,
     train,
     toggleTrain,

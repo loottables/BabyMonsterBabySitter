@@ -1,4 +1,4 @@
-export type ItemId = "kibble";
+export type ItemId = "kibble" | "treat" | "energy_drink" | "medicine" | "vaccine";
 
 export interface InventorySlot {
   itemId: ItemId;
@@ -9,19 +9,55 @@ export interface InventorySlot {
 export type Inventory = (InventorySlot | null)[];
 
 export interface ItemDef {
-  id: ItemId;
-  name: string;
+  id:          ItemId;
+  name:        string;
   description: string;
-  stats: string[];       // displayed in detail panel
-  actionLabel: string;   // e.g. "Feed to" — monster name appended at runtime
+  stats:       string[];
+  actionLabel: string;
+  price:       number;
 }
 
 export const ITEM_DEFS: Record<ItemId, ItemDef> = {
   kibble: {
-    id: "kibble",
-    name: "Kibble",
+    id:          "kibble",
+    name:        "Kibble",
     description: "Basic monster food.",
-    stats: ["Restores 30 hunger", "+5 happiness"],
+    stats:       ["Restores 30 hunger", "+5 happiness"],
     actionLabel: "Feed to",
+    price:       5,
+  },
+  treat: {
+    id:          "treat",
+    name:        "Treat",
+    description: "A sweet snack your monster loves.",
+    stats:       ["+40 happiness", "+5 hunger"],
+    actionLabel: "Give to",
+    price:       20,
+  },
+  energy_drink: {
+    id:          "energy_drink",
+    name:        "Energy Drink",
+    description: "Instantly restores all energy.",
+    stats:       ["Restores energy to max"],
+    actionLabel: "Give to",
+    price:       15,
+  },
+  medicine: {
+    id:          "medicine",
+    name:        "Medicine",
+    description: "Heals your monster back to full HP.",
+    stats:       ["Restores HP to max"],
+    actionLabel: "Use on",
+    price:       30,
+  },
+  vaccine: {
+    id:          "vaccine",
+    name:        "Vaccine",
+    description: "Cures your monster's illness immediately.",
+    stats:       ["Cures sickness"],
+    actionLabel: "Use on",
+    price:       25,
   },
 };
+
+export const SHOP_ITEMS: ItemId[] = ["kibble", "treat", "energy_drink", "medicine", "vaccine"];

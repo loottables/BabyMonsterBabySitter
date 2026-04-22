@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import StatsPanel from "./StatsPanel";
 import ActionPanel from "./ActionPanel";
 import BagView from "./BagView";
+import ShopPanel from "./ShopPanel";
 import SettingsPanel from "./SettingsPanel";
 import TrainingModal from "./TrainingModal";
 import DeathScreen from "./DeathScreen";
@@ -39,10 +40,11 @@ function EggCountdown({ hatchTime }: { hatchTime: number }) {
 
 export default function GameUI() {
   const {
-    monster, inventory, anim, message, isLoading, showTrain,
-    spawnMonster, useItem, deleteItem, clean, train, toggleTrain, wipeAll,
+    monster, inventory, coins, anim, message, isLoading, showTrain,
+    spawnMonster, useItem, deleteItem, buyItem, pet, clean, train, toggleTrain, wipeAll,
   } = useGameState();
   const [showBag,      setShowBag]      = useState(false);
+  const [showShop,     setShowShop]     = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   if (isLoading) {
@@ -157,6 +159,7 @@ export default function GameUI() {
           <p style={{ fontSize: "6px" }} className="text-monster-muted flex gap-3">
             <span>Day {monster.age}</span>
             <span>Lv.{monster.rpg.level}</span>
+            {monster.isSick                && <span className="animate-pulse">! Sick</span>}
             {monster.care.hunger <= 20    && <span className="animate-pulse">! Hungry</span>}
             {monster.care.happiness <= 20 && <span className="animate-pulse">! Sad</span>}
             {monster.poops.length >= 3    && <span className="animate-pulse">! Dirty</span>}
@@ -185,6 +188,8 @@ export default function GameUI() {
       <ActionPanel
         monster={monster}
         onBag={() => setShowBag(true)}
+        onShop={() => setShowShop(true)}
+        onPet={pet}
         onClean={clean}
         onTrain={toggleTrain}
         message={message}
@@ -196,6 +201,14 @@ export default function GameUI() {
 
       {monster.isDead && (
         <DeathScreen monster={monster} onReset={spawnMonster} />
+      )}
+
+      {showShop && (
+        <ShopPanel
+          coins={coins}
+          onBuy={buyItem}
+          onClose={() => setShowShop(false)}
+        />
       )}
 
       {showBag && (

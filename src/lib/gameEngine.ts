@@ -1,4 +1,5 @@
 import type { Monster, RPGStats, Poop, TrainingType } from "@/types/game";
+import type { ItemId } from "@/types/items";
 import {
   GAME_DAY_MS,
   DIGESTION_MS,
@@ -8,11 +9,18 @@ import {
   CLEANLINESS_DECAY_PER_MIN,
   ENERGY_REGEN_PER_MIN,
   POOP_HAPPINESS_DRAIN_PER_MIN,
+  SICK_FROM_POOP_MS,
+  SICK_FROM_HUNGER_MS,
+  SICK_HAPPINESS_DRAIN_PER_MIN,
   NEGLECT_DEATH_MS,
   SADNESS_DEATH_MS,
   HUNGER_ENERGY_DRAIN_MS,
   FEED_HUNGER_GAIN,
   FEED_HAPPINESS_GAIN,
+  TREAT_HAPPINESS_GAIN,
+  TREAT_HUNGER_GAIN,
+  PET_HAPPINESS_GAIN,
+  PET_COOLDOWN_MS,
   CLEAN_CLEANLINESS_GAIN,
   CLEAN_HAPPINESS_GAIN,
   BASE_EXP_TO_NEXT,
@@ -111,6 +119,10 @@ export function createMonster(): Monster {
     neglectStart:           null,
     sadStart:               null,
     lastHungerEnergyDrain:  null,
+    isSick:                 false,
+    sickStart:              null,
+    dirtyStart:             null,
+    lastPetTime:            null,
     isHatched:        EGG_HATCH_MS === 0,
     hatchTime:        t + EGG_HATCH_MS,
   };
@@ -217,6 +229,30 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
     }
   }
 
+  // Sickness triggers
+  if (!m.isDead && !m.isSick) {
+    // Dirty too long (3+ poops)
+    if (m.poops.length >= 3) {
+      if (m.dirtyStart === null) m.dirtyStart = toTime;
+      if (toTime - m.dirtyStart >= SICK_FROM_POOP_MS) m.isSick = true;
+    } else {
+      m.dirtyStart = null;
+    }
+    // Starving too long
+    if (m.neglectStart !== null && toTime - m.neglectStart >= SICK_FROM_HUNGER_MS) {
+      m.isSick = true;
+    }
+    if (m.isSick) m.sickStart = toTime;
+  }
+
+  // Sickness drains happiness faster
+  if (m.isSick && !m.isDead) {
+    m.care.happiness = clamp(m.care.happiness - SICK_HAPPINESS_DRAIN_PER_MIN * minutes);
+  }
+
+  // Reset dirtyStart if poops cleared (and not sick from it already)
+  if (m.poops.length < 3 && !m.isSick) m.dirtyStart = null;
+
   m.lastUpdated = toTime;
   return m;
 }
@@ -248,6 +284,62 @@ export function feedMonster(monster: Monster): ActionResult {
   return { ok: true, monster: m, message: `${m.name} munches happily!` };
 }
 
+export function applyItem(monster: Monster, itemId: ItemId): ActionResult {
+  if (!monster.isHatched) return { ok: false, message: "The egg hasn't hatched yet!" };
+  if (monster.isDead)     return { ok: false, message: "Monster is dead." };
+
+  switch (itemId) {
+    case "kibble":
+      return feedMonster(monster);
+
+    case "treat": {
+      if (monster.care.happiness >= 98)
+        return { ok: false, message: `${monster.name} is already happy!` };
+      const m = { ...monster, care: { ...monster.care,
+        happiness: clamp(monster.care.happiness + TREAT_HAPPINESS_GAIN),
+        hunger:    clamp(monster.care.hunger    + TREAT_HUNGER_GAIN),
+      }};
+      return { ok: true, monster: m, message: `${m.name} loved the treat!` };
+    }
+
+    case "energy_drink": {
+      const maxEnergy = 5 + Math.floor(monster.rpg.end / 5);
+      if (monster.care.energy >= maxEnergy)
+        return { ok: false, message: `${monster.name} is already full of energy!` };
+      const m = { ...monster, care: { ...monster.care, energy: maxEnergy } };
+      return { ok: true, monster: m, message: `${m.name} feels energized!` };
+    }
+
+    case "medicine": {
+      if (monster.rpg.hp >= monster.rpg.maxHp)
+        return { ok: false, message: `${monster.name} is already at full HP!` };
+      const m = { ...monster, rpg: { ...monster.rpg, hp: monster.rpg.maxHp } };
+      return { ok: true, monster: m, message: `${m.name} recovered fully!` };
+    }
+
+    case "vaccine": {
+      if (!monster.isSick)
+        return { ok: false, message: `${monster.name} isn't sick!` };
+      const m = { ...monster, isSick: false, sickStart: null };
+      return { ok: true, monster: m, message: `${m.name} is cured!` };
+    }
+  }
+}
+
+export function petMonster(monster: Monster): ActionResult {
+  if (!monster.isHatched) return { ok: false, message: "The egg hasn't hatched yet!" };
+  if (monster.isDead)     return { ok: false, message: "Monster is dead." };
+  const t = now();
+  if (monster.lastPetTime !== null && t - monster.lastPetTime < PET_COOLDOWN_MS)
+    return { ok: false, message: `You recently petted ${monster.name}!` };
+  const m = {
+    ...monster,
+    care: { ...monster.care, happiness: clamp(monster.care.happiness + PET_HAPPINESS_GAIN) },
+    lastPetTime: t,
+  };
+  return { ok: true, monster: m, message: `${m.name} enjoyed the attention!` };
+}
+
 export function cleanPoop(monster: Monster): ActionResult {
   if (!monster.isHatched) return { ok: false, message: "The egg hasn't hatched yet!" };
   if (monster.isDead) return { ok: false, message: "Monster is dead." };
@@ -274,6 +366,8 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
   const exercise = TRAINING_EXERCISES.find(e => e.id === type);
   if (!exercise) return { ok: false, message: "Unknown exercise." };
 
+  if (monster.isSick)
+    return { ok: false, message: `${monster.name} is too sick to train!` };
   if (Math.round(monster.care.energy) < 1)
     return { ok: false, message: `Not enough energy!` };
 
@@ -339,6 +433,10 @@ export function loadMonster(): Monster | null {
     if (m.mealsPending === undefined) m.mealsPending = 0;
     if (m.nextPoopTime === undefined) m.nextPoopTime = null;
     if ((m as unknown as Record<string, unknown>).isShiny === undefined) m.isShiny = false;
+    if (m.isSick      === undefined) m.isSick      = false;
+    if (m.sickStart   === undefined) m.sickStart   = null;
+    if (m.dirtyStart  === undefined) m.dirtyStart  = null;
+    if (m.lastPetTime === undefined) m.lastPetTime = null;
     // Apply offline decay before returning
     return applyDecay(m, Date.now());
   } catch {

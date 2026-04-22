@@ -43,9 +43,13 @@ export interface Monster {
   isShiny: boolean;
   isDead: boolean;
   deathTime?: number;
-  neglectStart: number | null;         // when hunger first hit 0
-  sadStart: number | null;             // when happiness first hit 0
-  lastHungerEnergyDrain: number | null; // timestamp of last hunger-based energy drain
+  neglectStart: number | null;
+  sadStart: number | null;
+  lastHungerEnergyDrain: number | null;
+  isSick: boolean;
+  sickStart: number | null;
+  dirtyStart: number | null;
+  lastPetTime: number | null;
   // Egg hatching
   isHatched: boolean;
   hatchTime: number;      // unix ms when the egg hatches

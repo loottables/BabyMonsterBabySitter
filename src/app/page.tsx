@@ -1,4 +1,5 @@
 import GameUI from "@/components/GameUI";
+import CoinsDisplay from "@/components/CoinsDisplay";
 
 export default function Home() {
   return (
@@ -17,6 +18,11 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {/* Coins */}
+      <div className="flex justify-center pt-4">
+        <CoinsDisplay />
+      </div>
 
       {/* Game */}
       <div className="flex-1 flex flex-col py-8">

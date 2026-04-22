@@ -4,7 +4,8 @@ import type { TrainingExercise } from "@/types/game";
 // Set to 0 for instant hatch (testing). Change to 10 * 60 * 1000 for production.
 export const EGG_HATCH_MS = 0;
 
-export const SHINY_CHANCE = 1 / 500;
+export const SHINY_CHANCE    = 1 / 500;
+export const STARTING_COINS  = 100;
 
 export const GAME_DAY_MS = 24 * 60 * 1000;    // 24 real minutes = 1 in-game day (1 min = 1 in-game hour)
 export const MAX_POOPS = 4;
@@ -17,19 +18,27 @@ export const DIGESTION_MS = 10 * 60 * 1000;   // 10 real minutes after eating �
 export const HUNGER_DECAY_PER_MIN = 100 / 120; // empties in 2 real hours
 export const HAPPINESS_DECAY_PER_MIN = 1.5;
 export const CLEANLINESS_DECAY_PER_MIN = 0.3;
-export const ENERGY_REGEN_PER_MIN = 1 / 30;  // +1 energy per 30 real minutes
+export const ENERGY_REGEN_PER_MIN = 1 / 15;  // +1 energy per 15 real minutes
 
 // Each uncleaned poop drags happiness down (applied on tick)
 export const POOP_HAPPINESS_DRAIN_PER_MIN = 0.5;
 
 // Death timers — total time from full hunger to death = 2h + 22h = 24h
+export const SICK_FROM_POOP_MS   = 15 * 60 * 1000;    // 15 min with 3+ poops → sick
+export const SICK_FROM_HUNGER_MS = 30 * 60 * 1000;    // 30 min at 0 hunger → sick
+export const SICK_HAPPINESS_DRAIN_PER_MIN = 2.0;       // extra happiness drain while sick
 export const NEGLECT_DEATH_MS = 22 * 60 * 60 * 1000;  // 22h at 0 hunger → death
 export const SADNESS_DEATH_MS = 12 * 60 * 60 * 1000;  // 12h at 0 happiness → death
 export const HUNGER_ENERGY_DRAIN_MS = 5 * 60 * 1000; // drain 1 energy per 5 min while starving
 
 // Feed / clean values
+export const PET_HAPPINESS_GAIN = 10;
+export const PET_COOLDOWN_MS    = 5 * 60 * 1000;  // 5 real minutes between pets
+
 export const FEED_HUNGER_GAIN = 30;
 export const FEED_HAPPINESS_GAIN = 5;
+export const TREAT_HAPPINESS_GAIN = 40;
+export const TREAT_HUNGER_GAIN = 5;
 export const CLEAN_CLEANLINESS_GAIN = 25;
 export const CLEAN_HAPPINESS_GAIN = 8;
 

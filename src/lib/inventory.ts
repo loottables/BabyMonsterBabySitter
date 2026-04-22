@@ -44,6 +44,21 @@ export function clearInventory() {
   localStorage.removeItem(KEY);
 }
 
+// Returns updated inventory, or null if no space
+export function addToInventory(inv: Inventory, itemId: ItemId): Inventory | null {
+  const stackIdx = inv.findIndex(s => s?.itemId === itemId);
+  if (stackIdx !== -1) {
+    const next = [...inv];
+    next[stackIdx] = { itemId, quantity: inv[stackIdx]!.quantity + 1 };
+    return next;
+  }
+  const emptyIdx = inv.findIndex(s => s === null);
+  if (emptyIdx === -1) return null;
+  const next = [...inv];
+  next[emptyIdx] = { itemId, quantity: 1 };
+  return next;
+}
+
 export function deleteSlot(inv: Inventory, index: number): Inventory {
   const next = [...inv];
   next[index] = null;

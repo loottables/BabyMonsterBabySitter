@@ -185,7 +185,7 @@ export default function BagView({ inventory, monster, message, onUse, onDelete, 
           <div
             className="fixed inset-0"
             style={{ zIndex: 60, backgroundColor: "rgba(0,0,0,0.45)" }}
-            onClick={dismissDetail}
+            onClick={e => { e.stopPropagation(); dismissDetail(); }}
           />
           <div
             className="fixed flex flex-col gap-3 border border-monster-border bg-monster-panel px-5 py-5"

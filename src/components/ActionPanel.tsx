@@ -1,6 +1,7 @@
 "use client";
 
 import type { Monster } from "@/types/game";
+import { PET_COOLDOWN_MS } from "@/lib/constants";
 
 interface BtnProps {
   label:    string;
@@ -32,16 +33,21 @@ function ActionBtn({ label, onClick, disabled, title }: BtnProps) {
 interface Props {
   monster:  Monster;
   onBag:    () => void;
+  onShop:   () => void;
+  onPet:    () => void;
   onClean:  () => void;
   onTrain:  () => void;
   message:  string;
 }
 
-export default function ActionPanel({ monster, onBag, onClean, onTrain, message }: Props) {
-  const { care, poops, isDead } = monster;
+export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, onTrain, message }: Props) {
+  const { care, poops, isDead, lastPetTime, name } = monster;
 
-  const canClean = !isDead && poops.length > 0;
-  const canTrain = !isDead && Math.round(care.energy) >= 1;
+  const now        = Date.now();
+  const canClean   = !isDead && poops.length > 0;
+  const canTrain   = !isDead && !monster.isSick && Math.round(care.energy) >= 1;
+  const petOnCooldown = lastPetTime !== null && now - lastPetTime < PET_COOLDOWN_MS;
+  const canPet     = !isDead && !petOnCooldown;
 
   return (
     <div className="flex flex-col gap-4">
@@ -53,11 +59,14 @@ export default function ActionPanel({ monster, onBag, onClean, onTrain, message 
         )}
       </div>
 
-      <div className="flex justify-center gap-3">
+      <div className="flex justify-center gap-3 flex-wrap">
+        <ActionBtn label="Bag"   onClick={onBag}   title="Open bag" />
+        <ActionBtn label="Shop"  onClick={onShop}  title="Visit the shop" />
         <ActionBtn
-          label="Bag"
-          onClick={onBag}
-          title="Open bag"
+          label="Pet"
+          onClick={onPet}
+          disabled={!canPet}
+          title={petOnCooldown ? `You recently petted ${name}` : "Pet your monster"}
         />
         <ActionBtn
           label={`Clean${poops.length > 0 ? ` (${poops.length})` : ""}`}
@@ -69,9 +78,10 @@ export default function ActionPanel({ monster, onBag, onClean, onTrain, message 
           label="Train"
           onClick={onTrain}
           disabled={!canTrain}
-          title={canTrain ? "Train your monster" : "No energy"}
+          title={monster.isSick ? `${name} is too sick to train` : canTrain ? "Train your monster" : "No energy"}
         />
       </div>
+
     </div>
   );
 }
