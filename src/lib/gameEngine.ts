@@ -101,18 +101,19 @@ const MONSTER_NAMES = [
 ];
 
 export function createMonster(): Monster {
-  const t = now();
+  const t   = now();
   const currentDay = Math.floor((t - t) / GAME_DAY_MS); // day 0
+  const rpg = randomStarterRpg();
   return {
     id:              uid(),
     name:            MONSTER_NAMES[Math.floor(Math.random() * MONSTER_NAMES.length)],
     seed:            Math.floor(Math.random() * 2 ** 31),
-    rpg:             randomStarterRpg(),
+    rpg,
     care: {
-      hunger:       80,
-      happiness:    80,
+      hunger:      100,
+      happiness:   100,
       cleanliness: 100,
-      energy:       5,
+      energy:      5 + Math.floor(rpg.end / 5),
     },
     age:              0,
     birthday:         t,
