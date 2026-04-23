@@ -2,7 +2,7 @@ import type { TrainingExercise } from "@/types/game";
 
 // ── Egg hatch time ─────────────────────────────────────────────────────────
 // Set to 0 for instant hatch (testing). Change to 10 * 60 * 1000 for production.
-export const EGG_HATCH_MS = 0;
+export const EGG_HATCH_MS = 5 * 1000;
 
 export const SHINY_CHANCE    = 1 / 500;
 export const STARTING_COINS  = 100;

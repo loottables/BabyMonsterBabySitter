@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import AuthScreen from "./AuthScreen";
 import GameUI from "./GameUI";
-import CoinsDisplay from "./CoinsDisplay";
 
 export default function GameGate() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -30,13 +29,8 @@ export default function GameGate() {
   if (!session) return <AuthScreen />;
 
   return (
-    <>
-      <div className="flex justify-center pt-4">
-        <CoinsDisplay />
-      </div>
-      <div className="flex-1 flex flex-col py-8">
-        <GameUI />
-      </div>
-    </>
+    <div className="flex-1 flex flex-col py-8">
+      <GameUI />
+    </div>
   );
 }

@@ -109,12 +109,15 @@ interface Props {
   bare?:   boolean;
 }
 
+const FRAME_MS = 1000 / 15; // ~15 fps
+
 export default function MonsterCanvas({ monster, anim, bare }: Props) {
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const rafRef     = useRef<number>(0);
-  const startRef   = useRef<number>(0);
-  const animRef    = useRef<AnimationState>(anim);
-  const monsterRef = useRef<Monster>(monster);
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const rafRef       = useRef<number>(0);
+  const startRef     = useRef<number>(0);
+  const lastFrameRef = useRef<number>(0);
+  const animRef      = useRef<AnimationState>(anim);
+  const monsterRef   = useRef<Monster>(monster);
 
   // Egg offscreen cache: only rebuilt when crackCount threshold changes
   const eggCacheRef = useRef<{ count: number; oc: HTMLCanvasElement } | null>(null);
@@ -138,6 +141,12 @@ export default function MonsterCanvas({ monster, anim, bare }: Props) {
     startRef.current = performance.now();
 
     function frame(ts: number) {
+      if (ts - lastFrameRef.current < FRAME_MS) {
+        rafRef.current = requestAnimationFrame(frame);
+        return;
+      }
+      lastFrameRef.current = ts;
+
       const elapsed = ts - startRef.current;
       const m       = monsterRef.current;
       const curAnim = animRef.current;

@@ -264,6 +264,10 @@ export default function GameUI() {
             Day {monster.age}
           </p>
         </div>
+        <div className="flex items-center gap-2 border border-monster-border px-3 py-1.5">
+          <span style={{ fontSize: "7px" }} className="text-monster-muted uppercase tracking-wide">Coins</span>
+          <span style={{ fontSize: "9px" }} className="font-bold text-monster-text tabular-nums">{coins.toLocaleString()}</span>
+        </div>
       </div>
 
       {/* Main layout */}

@@ -311,6 +311,8 @@ export function useGameState() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
   const animTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef     = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   // On mount: load from Supabase
   useEffect(() => {
@@ -376,9 +378,18 @@ export function useGameState() {
 
   // ── public actions ────────────────────────────────────────────────────────
 
-  const spawnMonster = useCallback(() => {
+  const spawnMonster = useCallback(async () => {
     const m = createMonster();
     dispatch({ type: "NEW_MONSTER", monster: m });
+    // Save immediately — don't rely on debounce which gets cancelled on unmount
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("game_saves").upsert(
+      { user_id: user.id, monster: m, inventory: stateRef.current.inventory, coins: stateRef.current.coins },
+      { onConflict: "user_id" }
+    );
   }, []);
 
   const useItem    = useCallback((i: number) => dispatch({ type: "USE_ITEM",    slotIndex: i }), []);
