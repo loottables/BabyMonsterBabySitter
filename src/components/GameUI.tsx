@@ -325,7 +325,7 @@ export default function GameUI() {
       )}
 
       {monster.isDead && (
-        <DeathScreen monster={monster} onReset={spawnMonster} />
+        <DeathScreen monster={monster} onReset={spawnMonster} onSettings={() => setShowSettings(true)} />
       )}
 
       {showShop && (
