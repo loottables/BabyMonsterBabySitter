@@ -77,7 +77,7 @@ export default function StatsPanel({ monster }: Props) {
         <StatBar label="Energy"  value={care.energy} max={maxEnergy} />
         {care.energy < maxEnergy && (() => {
           const frac = care.energy % 1;
-          const secsLeft = Math.max(1, Math.ceil((frac === 0 ? 1 : 1 - frac) * 1800));
+          const secsLeft = Math.max(1, Math.ceil((frac === 0 ? 1 : 1 - frac) * 900));
           const m = Math.floor(secsLeft / 60);
           const s = secsLeft % 60;
           return (
