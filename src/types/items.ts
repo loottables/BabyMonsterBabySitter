@@ -72,7 +72,7 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     description: "Treats injuries sustained in battle, allowing your monster to train and fight again.",
     stats:       ["Cures injured status"],
     actionLabel: "Use on",
-    price:       50,
+    price:       20,
   },
 };
 
