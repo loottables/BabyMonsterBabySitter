@@ -132,6 +132,7 @@ export function createMonster(): Monster {
     adventureStart:   null,
     isInjured:        false,
     injuredHealStart: null,
+    isSleeping:       false,
   };
 }
 
@@ -157,9 +158,23 @@ export function startAdventure(monster: Monster): ActionResult {
     ...monster,
     isAdventuring:  true,
     adventureStart: now(),
+    isSleeping:     false,
     care: { ...monster.care, energy: clamp(monster.care.energy - 1) },
   };
   return { ok: true, monster: m, message: `${m.name} sets out on an adventure!` };
+}
+
+export function sleepMonster(monster: Monster): ActionResult {
+  if (!monster.isHatched)    return { ok: false, message: "The egg hasn't hatched yet!" };
+  if (monster.isDead)        return { ok: false, message: "Monster is dead." };
+  if (monster.isAdventuring) return { ok: false, message: `${monster.name} is away adventuring!` };
+  if (monster.isSleeping)    return { ok: false, message: `${monster.name} is already sleeping.` };
+  return { ok: true, monster: { ...monster, isSleeping: true }, message: `${monster.name} falls asleep.` };
+}
+
+export function wakeMonster(monster: Monster): ActionResult {
+  if (!monster.isSleeping) return { ok: false, message: `${monster.name} is already awake.` };
+  return { ok: true, monster: { ...monster, isSleeping: false }, message: `${monster.name} wakes up!` };
 }
 
 // ── offline + tick decay ───────────────────────────────────────────────────
@@ -180,33 +195,41 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
 
   const minutes = ms / 60000;
 
-  // Stat decay
-  m.care.hunger      = clamp(m.care.hunger      - HUNGER_DECAY_PER_MIN      * minutes);
-  m.care.happiness   = clamp(m.care.happiness   - HAPPINESS_DECAY_PER_MIN   * minutes);
-  m.care.cleanliness = clamp(m.care.cleanliness - CLEANLINESS_DECAY_PER_MIN * minutes);
+  // Hunger always decays; energy always regens
+  m.care.hunger = clamp(m.care.hunger - HUNGER_DECAY_PER_MIN * minutes);
   const maxEnergy = 5 + Math.floor(m.rpg.end / 5);
   m.care.energy = clamp(m.care.energy + ENERGY_REGEN_PER_MIN * minutes, 0, maxEnergy);
 
-  // Each poop drains happiness
-  if (m.poops.length > 0) {
-    m.care.happiness = clamp(
-      m.care.happiness - POOP_HAPPINESS_DRAIN_PER_MIN * m.poops.length * minutes
-    );
+  if (!m.isSleeping) {
+    // Happiness + cleanliness only decay while awake
+    m.care.happiness   = clamp(m.care.happiness   - HAPPINESS_DECAY_PER_MIN   * minutes);
+    m.care.cleanliness = clamp(m.care.cleanliness - CLEANLINESS_DECAY_PER_MIN * minutes);
+
+    // Poop happiness drain only while awake
+    if (m.poops.length > 0) {
+      m.care.happiness = clamp(
+        m.care.happiness - POOP_HAPPINESS_DRAIN_PER_MIN * m.poops.length * minutes
+      );
+    }
   }
 
-  // Digestion: produce poops from queued meals
+  // Digestion: paused while sleeping (advance timer to prevent backlog on wake)
   if (m.nextPoopTime !== null) {
-    const newPoops = [...m.poops];
-    let pending = m.mealsPending;
-    let nextPoop = m.nextPoopTime;
-    while (pending > 0 && nextPoop <= toTime) {
-      if (newPoops.length < MAX_POOPS) newPoops.push(randomPoopPos());
-      pending--;
-      nextPoop = pending > 0 ? nextPoop + DIGESTION_MS : 0;
+    if (m.isSleeping) {
+      m.nextPoopTime += ms;
+    } else {
+      const newPoops = [...m.poops];
+      let pending = m.mealsPending;
+      let nextPoop = m.nextPoopTime;
+      while (pending > 0 && nextPoop <= toTime) {
+        if (newPoops.length < MAX_POOPS) newPoops.push(randomPoopPos());
+        pending--;
+        nextPoop = pending > 0 ? nextPoop + DIGESTION_MS : 0;
+      }
+      m.poops        = newPoops;
+      m.mealsPending = pending;
+      m.nextPoopTime = pending > 0 ? nextPoop : null;
     }
-    m.poops        = newPoops;
-    m.mealsPending = pending;
-    m.nextPoopTime = pending > 0 ? nextPoop : null;
   }
 
   // Training day reset
@@ -279,18 +302,18 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
     if (m.isSick) m.sickStart = toTime;
   }
 
-  // Sickness drains happiness faster
-  if (m.isSick && !m.isDead) {
-    m.care.happiness = clamp(m.care.happiness - SICK_HAPPINESS_DRAIN_PER_MIN * minutes);
+  // Sickness and injury happiness drains — frozen while sleeping
+  if (!m.isSleeping) {
+    if (m.isSick && !m.isDead) {
+      m.care.happiness = clamp(m.care.happiness - SICK_HAPPINESS_DRAIN_PER_MIN * minutes);
+    }
+    if (m.isInjured && !m.isDead) {
+      m.care.happiness = clamp(m.care.happiness - INJURED_HAPPINESS_DRAIN_PER_MIN * minutes);
+    }
   }
 
-  // Injury also drains happiness
-  if (m.isInjured && !m.isDead) {
-    m.care.happiness = clamp(m.care.happiness - INJURED_HAPPINESS_DRAIN_PER_MIN * minutes);
-  }
-
-  // HP regeneration — paused while sick; doubled when happy + clean + hunger ≥ 50
-  if (!m.isDead && !m.isSick && m.rpg.hp < m.rpg.maxHp) {
+  // HP regeneration — paused while sick or sleeping; doubled when happy + clean + hunger ≥ 50
+  if (!m.isDead && !m.isSick && !m.isSleeping && m.rpg.hp < m.rpg.maxHp) {
     const wellCared   = m.care.happiness >= 50 && m.care.cleanliness >= 50 && m.care.hunger >= 50;
     const regenPerMin = m.rpg.maxHp * HP_REGEN_PCT_PER_MIN * (wellCared ? 2 : 1);
     m.rpg.hp = Math.min(m.rpg.maxHp, m.rpg.hp + regenPerMin * minutes);
@@ -530,6 +553,7 @@ export function loadMonster(): Monster | null {
     if (m.adventureStart  === undefined) m.adventureStart   = null;
     if (m.isInjured         === undefined) m.isInjured         = false;
     if (m.injuredHealStart  === undefined) m.injuredHealStart  = null;
+    if (m.isSleeping        === undefined) m.isSleeping        = false;
     // Apply offline decay before returning
     return applyDecay(m, Date.now());
   } catch {

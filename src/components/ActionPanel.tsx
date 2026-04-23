@@ -38,18 +38,22 @@ interface Props {
   onClean:     () => void;
   onTrain:     () => void;
   onAdventure: () => void;
+  onSleep:     () => void;
+  onWake:      () => void;
   message:     string;
 }
 
-export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, onTrain, onAdventure, message }: Props) {
-  const { care, poops, isDead, lastPetTime, name, isAdventuring, isSick, isInjured } = monster;
+export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, onTrain, onAdventure, onSleep, onWake, message }: Props) {
+  const { care, poops, isDead, lastPetTime, name, isAdventuring, isSick, isInjured, isSleeping } = monster;
 
   const now           = Date.now();
-  const canClean      = !isDead && poops.length > 0;
-  const canTrain      = !isDead && !isSick && !isInjured && Math.round(care.energy) >= 1 && !isAdventuring;
+  const canClean      = !isDead && poops.length > 0 && !isSleeping;
+  const canTrain      = !isDead && !isSick && !isInjured && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
   const petOnCooldown = lastPetTime !== null && now - lastPetTime < PET_COOLDOWN_MS;
-  const canPet        = !isDead && !petOnCooldown && !isAdventuring;
-  const canAdventure  = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring;
+  const canPet        = !isDead && !petOnCooldown && !isAdventuring && !isSleeping;
+  const canAdventure  = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
+  const canSleep      = !isDead && !isAdventuring && !isSleeping;
+  const canWake       = !isDead && isSleeping;
 
   const trainTitle = isSick       ? `${name} is too sick to train`
                    : isInjured    ? `${name} is injured — use a First Aid Kit first`
@@ -101,6 +105,21 @@ export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, on
           disabled={!canAdventure}
           title={adventureTitle}
         />
+        {isSleeping ? (
+          <ActionBtn
+            label="Wake"
+            onClick={onWake}
+            disabled={!canWake}
+            title="Wake your monster up"
+          />
+        ) : (
+          <ActionBtn
+            label="Sleep"
+            onClick={onSleep}
+            disabled={!canSleep}
+            title="Put your monster to sleep — pauses poops, happiness, and cleanliness decay"
+          />
+        )}
       </div>
 
     </div>

@@ -43,6 +43,21 @@ function EggCountdown({ hatchTime }: { hatchTime: number }) {
   );
 }
 
+function SleepOverlay() {
+  return (
+    <div
+      className="absolute inset-0 flex flex-col items-end justify-start pt-10 pr-8 pointer-events-none"
+      style={{ backgroundColor: "rgba(0,0,20,0.45)" }}
+    >
+      <div className="flex flex-col items-center gap-1">
+        <span style={{ fontSize: "18px", animationDelay: "0ms"   }} className="text-monster-text opacity-90 animate-bounce">Z</span>
+        <span style={{ fontSize: "13px", animationDelay: "300ms" }} className="text-monster-text opacity-60 animate-bounce">z</span>
+        <span style={{ fontSize: "9px",  animationDelay: "600ms" }} className="text-monster-text opacity-35 animate-bounce">z</span>
+      </div>
+    </div>
+  );
+}
+
 function AdventureOverlay({ adventureStart }: { adventureStart: number }) {
   const end = adventureStart + ADVENTURE_DURATION_MS;
   const [msLeft, setMsLeft] = useState(() => Math.max(0, end - Date.now()));
@@ -76,7 +91,7 @@ export default function GameUI() {
     monster, inventory, coins, anim, message, isLoading, showTrain,
     adventureResult, pendingEncounter, activeBattle,
     spawnMonster, useItem, deleteItem, buyItem, sellItem, pet, clean, train, toggleTrain,
-    adventure, dismissAdventureResult, runFromBattle, acceptBattle, completeBattle,
+    sleep, wake, adventure, dismissAdventureResult, runFromBattle, acceptBattle, completeBattle,
     rename, wipeAll,
   } = useGameState();
   const [showBag,      setShowBag]      = useState(false);
@@ -270,6 +285,7 @@ export default function GameUI() {
               )}
             </div>
 
+            {monster.isSleeping && <SleepOverlay />}
             {monster.isAdventuring && monster.adventureStart !== null && (
               <AdventureOverlay adventureStart={monster.adventureStart} />
             )}
@@ -291,6 +307,8 @@ export default function GameUI() {
         onPet={pet}
         onClean={clean}
         onTrain={toggleTrain}
+        onSleep={sleep}
+        onWake={wake}
         onAdventure={adventure}
         message={message}
       />

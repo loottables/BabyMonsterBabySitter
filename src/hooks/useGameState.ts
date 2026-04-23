@@ -7,6 +7,7 @@ import {
   createMonster, loadMonster, saveMonster, clearMonster,
   cleanPoop, trainMonster, petMonster, applyDecay, applyItem,
   grantExp, startAdventure as doStartAdventure,
+  sleepMonster as doSleep, wakeMonster as doWake,
 } from "@/lib/gameEngine";
 import { resolveAdventure, type AdventureResultData } from "@/lib/adventureEngine";
 import type { WildMonster, BattleResult } from "@/lib/battleEngine";
@@ -59,6 +60,8 @@ type Action =
   | { type: "ACCEPT_BATTLE";    useFirstAidKit: boolean }
   | { type: "COMPLETE_BATTLE" }
   | { type: "SELL_ITEM";              slotIndex: number }
+  | { type: "SLEEP" }
+  | { type: "WAKE" }
   | { type: "RESET" }
   | { type: "WIPE_ALL" }
   | { type: "SET_ANIM";               anim: AnimationState }
@@ -261,6 +264,20 @@ function reducer(state: State, action: Action): State {
       return { ...state, inventory: inv, coins: state.coins + sellPrice };
     }
 
+    case "SLEEP": {
+      if (!state.monster) return state;
+      const result = doSleep(state.monster);
+      if (!result.ok) return { ...state, message: result.message };
+      return { ...state, monster: result.monster, message: result.message };
+    }
+
+    case "WAKE": {
+      if (!state.monster) return state;
+      const result = doWake(state.monster);
+      if (!result.ok) return { ...state, message: result.message };
+      return { ...state, monster: result.monster, anim: "happy", message: result.message };
+    }
+
     case "RESET": {
       clearMonster();
       return { ...state, monster: null, anim: "idle", message: "", showTrain: false };
@@ -365,6 +382,8 @@ export function useGameState() {
   const clean      = useCallback(() => dispatch({ type: "CLEAN" }), []);
   const train      = useCallback((ex: TrainingType) => dispatch({ type: "TRAIN", exercise: ex }), []);
   const toggleTrain = useCallback(() => dispatch({ type: "TOGGLE_TRAIN_MODAL" }), []);
+  const sleep                  = useCallback(() => dispatch({ type: "SLEEP" }), []);
+  const wake                   = useCallback(() => dispatch({ type: "WAKE"  }), []);
   const adventure              = useCallback(() => dispatch({ type: "START_ADVENTURE" }), []);
   const dismissAdventureResult = useCallback(() => dispatch({ type: "DISMISS_ADVENTURE_RESULT" }), []);
   const runFromBattle          = useCallback(() => dispatch({ type: "RUN_FROM_BATTLE" }), []);
@@ -392,6 +411,8 @@ export function useGameState() {
     clean,
     train,
     toggleTrain,
+    sleep,
+    wake,
     adventure,
     dismissAdventureResult,
     runFromBattle,
