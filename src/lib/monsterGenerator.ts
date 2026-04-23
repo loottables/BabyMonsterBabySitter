@@ -725,15 +725,15 @@ function addEyes(
   hw: number, hh: number,
   style: EyeStyle,
 ) {
-  // Radius: 25% of min face dimension, clamped 2–4
-  const r = Math.max(2, Math.min(4, Math.round(Math.min(hw, hh) * 0.25)));
+  // Radius: 18% of min face dimension, clamped 2–3
+  const r = Math.max(2, Math.min(3, Math.round(Math.min(hw, hh) * 0.18)));
   // Some styles expand rx — account for it when clamping spread
   const maxRx = (style === "wide" || style === "alien") ? r + 2
               : (style === "slit") ? r + 1
               : r;
   // Outer eye edge must stay within body: spread + maxRx ≤ hw - 2
   const maxSpread = hw - maxRx - 2;
-  const idealSpread = Math.round(hw * 0.38);
+  const idealSpread = Math.round(hw * 0.33);
   const spread = Math.min(maxSpread, Math.max(r + 2, idealSpread));
   const eyeY   = cy - Math.round(hh * 0.15);
 
