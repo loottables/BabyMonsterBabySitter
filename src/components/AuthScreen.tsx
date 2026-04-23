@@ -7,6 +7,7 @@ export default function AuthScreen() {
   const [mode,     setMode]     = useState<"signin" | "signup">("signin");
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
+  const [confirm,  setConfirm]  = useState("");
   const [error,    setError]    = useState("");
   const [message,  setMessage]  = useState("");
   const [loading,  setLoading]  = useState(false);
@@ -26,6 +27,7 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (mode === "signup") {
+        if (password !== confirm) throw new Error("Passwords do not match.");
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         setMessage("Check your email to confirm your account.");
@@ -87,6 +89,16 @@ export default function AuthScreen() {
             required
             className="border border-monster-border bg-monster-panel text-monster-text text-xs px-3 py-2 placeholder:text-monster-muted focus:outline-none focus:border-monster-text"
           />
+          {mode === "signup" && (
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              required
+              className="border border-monster-border bg-monster-panel text-monster-text text-xs px-3 py-2 placeholder:text-monster-muted focus:outline-none focus:border-monster-text"
+            />
+          )}
           {error   && <p className="text-xs" style={{ color: "#d8a8a8" }}>{error}</p>}
           {message && <p className="text-xs" style={{ color: "#a8d8a8" }}>{message}</p>}
           <button
@@ -99,7 +111,7 @@ export default function AuthScreen() {
         </form>
 
         <button
-          onClick={() => { setMode(m => m === "signin" ? "signup" : "signin"); setError(""); setMessage(""); }}
+          onClick={() => { setMode(m => m === "signin" ? "signup" : "signin"); setConfirm(""); setError(""); setMessage(""); }}
           className="text-xs text-monster-muted hover:text-monster-text transition-colors"
         >
           {mode === "signin" ? "No account? Create one" : "Have an account? Sign in"}

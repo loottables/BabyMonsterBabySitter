@@ -17,11 +17,12 @@ create policy "Users can update their own profile"
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into profiles (id)
-  values (new.id);
+  insert into public.profiles (id)
+  values (new.id)
+  on conflict (id) do nothing;
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 create or replace trigger on_auth_user_created
   after insert on auth.users
