@@ -534,7 +534,8 @@ function renderBody(
 // ── anime-style eyes ───────────────────────────────────────────────────────
 // Each eye uses: white sclera → dark iris ring → darker pupil → sparkle.
 
-type EyeStyle = "round" | "oval" | "wide" | "angry" | "happy" | "sleepy" | "sparkly";
+type EyeStyle = "round" | "oval" | "wide" | "angry" | "happy" | "sleepy" | "sparkly" |
+                "cross" | "dot" | "slit" | "star" | "narrow" | "hollow" | "alien" | "glare";
 
 // Fill an ellipse with v only where the current pixel is part of the "base"
 // (i.e. inside the body). We don't mask here — just write unconditionally since
@@ -636,6 +637,85 @@ function drawOneEye(
       set(g, ex - Math.floor(r * 0.2), ey + Math.floor(r * 0.5), 245);
       break;
     }
+
+    case "cross": {
+      // X-shaped markings — dazed/confused
+      eyeEllipse(g, ex, ey, r, r, 238);
+      for (let i = -(r - 1); i <= r - 1; i++) {
+        set(g, ex + i, ey + i, 18);
+        set(g, ex + i, ey - i, 18);
+      }
+      break;
+    }
+
+    case "dot": {
+      // Tiny 2×2 block — minimalist cute
+      set(g, ex,     ey,     18);
+      set(g, ex + 1, ey,     18);
+      set(g, ex,     ey + 1, 18);
+      set(g, ex + 1, ey + 1, 18);
+      break;
+    }
+
+    case "slit": {
+      // Cat-eye: wide sclera + narrow vertical slit pupil
+      eyeEllipse(g, ex, ey, r + 1, r, 238);
+      eyeEllipse(g, ex, ey + 1, r, r - 1, 55);
+      for (let dy = -r; dy <= r; dy++) set(g, ex, ey + dy, 18);
+      if (r >= 3) {
+        for (let dy = -(r - 2); dy <= r - 2; dy++) {
+          set(g, ex - 1, ey + dy, 18);
+          set(g, ex + 1, ey + dy, 18);
+        }
+      }
+      drawSparkle(g, ex, ey, r);
+      break;
+    }
+
+    case "star": {
+      // Round eye with plus/cross-shaped pupil
+      eyeEllipse(g, ex, ey, r, r, 238);
+      eyeEllipse(g, ex, ey + 1, r - 1, r - 1, 55);
+      const arm = Math.max(1, r - 2);
+      for (let i = -arm; i <= arm; i++) {
+        set(g, ex + i, ey + 1, 18);
+        set(g, ex,     ey + 1 + i, 18);
+      }
+      drawEyelid(g, ex, ey, r, r);
+      drawSparkle(g, ex, ey, r);
+      break;
+    }
+
+    case "narrow": {
+      // Squinting horizontal slit — suspicious/sly
+      const ry = Math.max(1, Math.floor(r / 2));
+      drawEyeCore(g, ex, ey, r, ry);
+      break;
+    }
+
+    case "hollow": {
+      // Ghost eyes — white ring, dark hollow center
+      eyeEllipse(g, ex, ey, r, r, 238);
+      eyeEllipse(g, ex, ey, r - 1, r - 1, 18);
+      break;
+    }
+
+    case "alien": {
+      // Large all-black almond eye — no sclera, just dark
+      eyeEllipse(g, ex, ey, r + 1, r + 2, 18);
+      drawSparkle(g, ex, ey - 1, r + 1);
+      break;
+    }
+
+    case "glare": {
+      // Sultry heavy lid: outer corner droops down (opposite of angry)
+      drawEyeCore(g, ex, ey, r, r);
+      for (let dy = -r; dy <= 0; dy++)
+        for (let dx = 0; dx <= r; dx++)
+          if (dy + dx * (-flip) < -r * 0.3)
+            set(g, ex + dx * (-flip), ey + dy, 18);
+      break;
+    }
   }
 }
 
@@ -647,8 +727,10 @@ function addEyes(
 ) {
   // Radius: 25% of min face dimension, clamped 2–4
   const r = Math.max(2, Math.min(4, Math.round(Math.min(hw, hh) * 0.25)));
-  // The "wide" style adds 2px to rx — account for it when clamping spread
-  const maxRx = style === "wide" ? r + 2 : r;
+  // Some styles expand rx — account for it when clamping spread
+  const maxRx = (style === "wide" || style === "alien") ? r + 2
+              : (style === "slit") ? r + 1
+              : r;
   // Outer eye edge must stay within body: spread + maxRx ≤ hw - 2
   const maxSpread = hw - maxRx - 2;
   const idealSpread = Math.round(hw * 0.38);
@@ -729,10 +811,32 @@ function addMouth(
 
 // ── nose ──────────────────────────────────────────────────────────────────
 
-function addNose(g: PixelGrid, cx: number, cy: number, hh: number, dark: number) {
+type NoseStyle = "dots" | "dot" | "circle" | "oval";
+
+function addNose(g: PixelGrid, cx: number, cy: number, hh: number, dark: number, style: NoseStyle, rng: RNG) {
   const ny = cy - Math.round(hh * 0.05);
-  set(g, cx - 1, ny, dark);
-  set(g, cx + 1, ny, dark);
+  switch (style) {
+    case "dots":
+      set(g, cx - 1, ny, dark);
+      set(g, cx + 1, ny, dark);
+      break;
+    case "dot":
+      set(g, cx, ny, dark);
+      break;
+    case "circle": {
+      const r = rng.nextInt(1, 2);
+      fillCircle(g, cx, ny, r, dark);
+      break;
+    }
+    case "oval": {
+      const horiz = rng.nextBool(0.5);
+      const base  = rng.nextInt(1, 2);
+      const rx    = horiz ? base + 1 : base;
+      const ry    = horiz ? base     : base + 1;
+      fillEllipse(g, cx, ny, rx, ry, dark);
+      break;
+    }
+  }
 }
 
 // ── blush ─────────────────────────────────────────────────────────────────
@@ -984,7 +1088,8 @@ export function generateMonster(seed: number): PixelGrid {
   const bodyMask = new Uint8Array(g);
 
   // ── eyes ──
-  const eyeStyles: EyeStyle[] = ["round", "oval", "wide", "angry", "happy", "sleepy", "sparkly"];
+  const eyeStyles: EyeStyle[] = ["round", "oval", "wide", "angry", "happy", "sleepy", "sparkly",
+                                  "cross", "dot", "slit", "star", "narrow", "hollow", "alien", "glare"];
   addEyes(g, cx, cy, hw, hh, rng.pick(eyeStyles));
 
   // ── mouth ──
@@ -992,7 +1097,10 @@ export function generateMonster(seed: number): PixelGrid {
   addMouth(g, cx, cy, hw, hh, rng.pick(mouthStyles), dark);
 
   // ── optional internal ──
-  if (rng.nextBool(0.45)) addNose(g, cx, cy, hh, dark);
+  if (rng.nextBool(0.45)) {
+    const noseStyles: NoseStyle[] = ["dots", "dot", "circle", "oval"];
+    addNose(g, cx, cy, hh, dark, rng.pick(noseStyles), rng);
+  }
   if (rng.nextBool(0.35)) addBlush(g, cx, cy, hw, hh, base);
 
   // Clip every internal feature to the body silhouette.
