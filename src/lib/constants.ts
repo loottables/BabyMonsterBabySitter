@@ -33,8 +33,6 @@ export const HUNGER_ENERGY_DRAIN_MS = 5 * 60 * 1000; // drain 1 energy per 5 min
 
 // Feed / clean values
 export const ADVENTURE_DURATION_MS  = 5 * 1000; // TESTING: 5 seconds (production: 10 * 60 * 1000)
-export const ADVENTURE_EXP_BASE     = 30;   // flat EXP per adventure
-export const ADVENTURE_EXP_PERCENT  = 0.10; // +10% of monster's current EXP
 
 export const PET_HAPPINESS_GAIN = 10;
 export const PET_COOLDOWN_MS    = 5 * 60 * 1000;  // 5 real minutes between pets

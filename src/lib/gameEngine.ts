@@ -132,9 +132,15 @@ export function createMonster(): Monster {
 }
 
 export function grantExp(monster: Monster, exp: number): Monster {
+  const prevLevel = monster.rpg.level;
   let rpg = { ...monster.rpg, exp: monster.rpg.exp + exp };
   rpg = levelUp(rpg);
-  return { ...monster, rpg };
+  let care = monster.care;
+  if (rpg.level > prevLevel) {
+    const maxEnergy = 5 + Math.floor(rpg.end / 5);
+    care = { ...care, energy: care.energy < maxEnergy / 2 ? maxEnergy / 2 : maxEnergy };
+  }
+  return { ...monster, rpg, care };
 }
 
 export function startAdventure(monster: Monster): ActionResult {
@@ -398,24 +404,31 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
   if (Math.round(monster.care.energy) < 1)
     return { ok: false, message: `Not enough energy!` };
 
+  const prevLevel = monster.rpg.level;
   let rpg = { ...monster.rpg };
 
   switch (type) {
-    case "pushups":   rpg.atk   += exercise.statGain; break;
-    case "situps":    rpg.def   += exercise.statGain; break;
-    case "sprint":    rpg.agi   += exercise.statGain; rpg.spd += 1; break;
+    case "pushups":   rpg.atk += exercise.statGain; break;
+    case "situps":    rpg.def += exercise.statGain; break;
+    case "sprint":    rpg.agi += exercise.statGain; rpg.spd += 1; break;
     case "endurance": rpg.end += exercise.statGain; break;
   }
 
   rpg.exp += exercise.expGain;
   rpg     = levelUp(rpg);
 
+  const maxEnergy = 5 + Math.floor(rpg.end / 5);
+  let newEnergy   = clamp(monster.care.energy - exercise.energyCost, 0, maxEnergy);
+  if (rpg.level > prevLevel) {
+    newEnergy = newEnergy < maxEnergy / 2 ? maxEnergy / 2 : maxEnergy;
+  }
+
   const m: Monster = {
     ...monster,
     rpg,
     care: {
       ...monster.care,
-      energy: clamp(monster.care.energy - exercise.energyCost),
+      energy: newEnergy,
       hunger: clamp(monster.care.hunger - exercise.hungerCost),
     },
     trainingsToday: monster.trainingsToday + 1,

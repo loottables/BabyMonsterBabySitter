@@ -1,5 +1,4 @@
 import type { ItemId } from "@/types/items";
-import { ADVENTURE_EXP_BASE, ADVENTURE_EXP_PERCENT } from "./constants";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -310,13 +309,12 @@ function pick<T>(rng: () => number, arr: T[]): T {
 
 // ── Resolution ─────────────────────────────────────────────────────────────
 
-type EventType = "item" | "exp" | "both" | "quiet";
+type EventType = "both" | "exp" | "quiet";
 
 const EVENT_WEIGHTS: { id: EventType; weight: number }[] = [
-  { id: "both",  weight: 15 },
-  { id: "item",  weight: 25 },
+  { id: "both",  weight: 39 },  // item always paired with exp (was 15 + 24 item-only)
   { id: "exp",   weight: 50 },
-  { id: "quiet", weight: 10 },
+  { id: "quiet", weight: 11 },
 ];
 
 export function resolveAdventure(monsterName: string, seed: number, monsterExp: number): AdventureResultData {
@@ -324,20 +322,23 @@ export function resolveAdventure(monsterName: string, seed: number, monsterExp: 
   const scenario = pick(rng, SCENARIOS);
   const event    = pickWeighted(rng, EVENT_WEIGHTS);
 
-  const giveItem = event === "item" || event === "both";
-  const giveExp  = event === "exp"  || event === "both";
+  const itemFound = event === "both" ? pickWeighted(rng, ADVENTURE_ITEM_POOL) : null;
 
-  const itemFound = giveItem ? pickWeighted(rng, ADVENTURE_ITEM_POOL) : null;
-  const expGained = giveExp
-    ? ADVENTURE_EXP_BASE + Math.floor(monsterExp * ADVENTURE_EXP_PERCENT)
-    : 0;
+  // Item + exp: flat 10 + 1–5% of current exp (smaller bonus alongside loot)
+  // Exp only:   8–18% of current exp
+  // Quiet:      no exp
+  let expGained = 0;
+  if (event === "both") {
+    expGained = 10 + Math.floor(monsterExp * (rng() * 0.04 + 0.01));
+  } else if (event === "exp") {
+    expGained = Math.floor(monsterExp * (rng() * 0.10 + 0.08));
+  }
 
   // Build narrative
   let eventLine: string;
   switch (event) {
-    case "item":  eventLine = pick(rng, scenario.itemEvents); break;
-    case "exp":   eventLine = pick(rng, scenario.expEvents);  break;
-    case "both":  eventLine = pick(rng, scenario.bothEvents); break;
+    case "exp":   eventLine = pick(rng, scenario.expEvents);   break;
+    case "both":  eventLine = pick(rng, scenario.bothEvents);  break;
     default:      eventLine = pick(rng, scenario.quietEvents);
   }
 
