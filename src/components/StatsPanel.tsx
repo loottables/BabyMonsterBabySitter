@@ -1,6 +1,7 @@
 "use client";
 
 import type { Monster } from "@/types/game";
+import { HP_REGEN_PCT_PER_MIN } from "@/lib/constants";
 
 interface BarProps {
   label: string;
@@ -52,6 +53,16 @@ export default function StatsPanel({ monster }: Props) {
   const expPct    = Math.round((rpg.exp / rpg.expToNext) * 100);
   const maxEnergy = 5 + Math.floor(rpg.end / 5);
 
+  const hpDisplay   = Math.min(rpg.maxHp, Math.round(rpg.hp));
+  const hpPct       = Math.round((rpg.hp / rpg.maxHp) * 100);
+  const hpLow       = hpPct <= 25;
+  const hpColor     = hpPct > 50 ? undefined : hpPct > 25 ? "#d8d8a8" : "#d8a8a8";
+  const canRegenHp  = !monster.isSick && !monster.isInjured;
+  const hpRegenPerMin = rpg.maxHp * HP_REGEN_PCT_PER_MIN;
+  const secsToFull  = rpg.hp < rpg.maxHp
+    ? Math.ceil((rpg.maxHp - rpg.hp) / hpRegenPerMin * 60)
+    : 0;
+
   return (
     <div className="flex flex-col gap-3">
       {/* Care stats */}
@@ -87,7 +98,33 @@ export default function StatsPanel({ monster }: Props) {
           </span>
         </div>
 
-        <RPGRow label="HP"  value={rpg.hp}  />
+        {/* HP bar */}
+        <div className="flex flex-col gap-1 mb-0.5">
+          <div className="flex items-center justify-between" style={{ fontSize: "7px" }}>
+            <span className="text-monster-muted uppercase tracking-wider">HP</span>
+            <span className={hpLow ? "text-white" : "text-monster-muted"}>
+              {hpDisplay}/{rpg.maxHp}
+            </span>
+          </div>
+          <div className="h-2 w-full bg-monster-border overflow-hidden">
+            <div
+              className="h-full transition-all duration-300"
+              style={{
+                width: `${hpPct}%`,
+                backgroundColor: hpColor ?? "var(--color-monster-text, #c8c8c8)",
+                opacity: hpLow ? 0.5 : 1,
+              }}
+            />
+          </div>
+          {rpg.hp < rpg.maxHp && (
+            <p style={{ fontSize: "6px" }} className="text-monster-muted text-right">
+              {canRegenHp
+                ? `Full in ${Math.floor(secsToFull / 60)}:${String(secsToFull % 60).padStart(2, "0")}`
+                : monster.isSick ? "Paused — sick" : "Paused — injured"}
+            </p>
+          )}
+        </div>
+
         <RPGRow label="ATK" value={rpg.atk} />
         <RPGRow label="DEF" value={rpg.def} />
         <RPGRow label="AGI" value={rpg.agi} />

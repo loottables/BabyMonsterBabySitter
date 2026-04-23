@@ -18,7 +18,8 @@ export const DIGESTION_MS = 10 * 60 * 1000;   // 10 real minutes after eating â†
 export const HUNGER_DECAY_PER_MIN = 100 / 120; // empties in 2 real hours
 export const HAPPINESS_DECAY_PER_MIN = 1.5;
 export const CLEANLINESS_DECAY_PER_MIN = 0.3;
-export const ENERGY_REGEN_PER_MIN = 1 / 15;  // +1 energy per 15 real minutes
+export const ENERGY_REGEN_PER_MIN  = 1 / 15;  // +1 energy per 15 real minutes
+export const HP_REGEN_PCT_PER_MIN  = 0.02;    // 1% of maxHp per 30 s (= 2% per min); paused when sick or injured
 
 // Each uncleaned poop drags happiness down (applied on tick)
 export const POOP_HAPPINESS_DRAIN_PER_MIN = 0.5;

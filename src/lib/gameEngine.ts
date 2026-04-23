@@ -8,6 +8,7 @@ import {
   HAPPINESS_DECAY_PER_MIN,
   CLEANLINESS_DECAY_PER_MIN,
   ENERGY_REGEN_PER_MIN,
+  HP_REGEN_PCT_PER_MIN,
   POOP_HAPPINESS_DRAIN_PER_MIN,
   SICK_FROM_POOP_MS,
   SICK_FROM_HUNGER_MS,
@@ -285,6 +286,12 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
   // Injury also drains happiness
   if (m.isInjured && !m.isDead) {
     m.care.happiness = clamp(m.care.happiness - INJURED_HAPPINESS_DRAIN_PER_MIN * minutes);
+  }
+
+  // HP regeneration — paused while sick or injured
+  if (!m.isDead && !m.isSick && !m.isInjured && m.rpg.hp < m.rpg.maxHp) {
+    const regenPerMin = m.rpg.maxHp * HP_REGEN_PCT_PER_MIN;
+    m.rpg.hp = Math.min(m.rpg.maxHp, m.rpg.hp + regenPerMin * minutes);
   }
 
   // Reset dirtyStart if poops cleared (and not sick from it already)
