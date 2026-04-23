@@ -148,7 +148,7 @@ export function wildToDisplayMonster(wild: WildMonster): Monster {
     hatchTime:             t,
     rpg: {
       hp: wild.rpg.hp, maxHp: wild.rpg.maxHp,
-      atk: wild.rpg.atk, def: wild.rpg.def,
+      str: 5, atk: wild.rpg.atk, def: wild.rpg.def,
       agi: wild.rpg.agi, spd: wild.rpg.spd,
       end: 5, level: wild.level, exp: 0, expToNext: 60,
     },
@@ -172,5 +172,7 @@ export function wildToDisplayMonster(wild: WildMonster): Monster {
     isAdventuring:         false,
     adventureStart:        null,
     isInjured:             false,
+    injuredHealStart:      null,
+    isSleeping:            false,
   };
 }

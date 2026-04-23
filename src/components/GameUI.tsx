@@ -15,6 +15,7 @@ import BattleView from "./BattleView";
 import { useGameState } from "@/hooks/useGameState";
 import { checkName } from "@/lib/nameFilter";
 import { ADVENTURE_DURATION_MS } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/client";
 
 const MonsterCanvas = dynamic(() => import("./MonsterCanvas"), { ssr: false });
 
@@ -101,6 +102,10 @@ export default function GameUI() {
   const [nameInput,    setNameInput]    = useState("");
   const [nameError,    setNameError]    = useState("");
 
+  async function handleSignOut() {
+    await createClient().auth.signOut();
+  }
+
   function startRename() {
     if (!monster) return;
     setNameInput(monster.name);
@@ -162,6 +167,7 @@ export default function GameUI() {
           hasMonster={false}
           onAbandon={spawnMonster}
           onWipeAll={wipeAll}
+          onSignOut={handleSignOut}
           onClose={() => setShowSettings(false)}
         />
       )}
@@ -209,6 +215,7 @@ export default function GameUI() {
           hasMonster={true}
           onAbandon={spawnMonster}
           onWipeAll={wipeAll}
+          onSignOut={handleSignOut}
           onClose={() => setShowSettings(false)}
         />
       )}
@@ -373,6 +380,7 @@ export default function GameUI() {
           hasMonster={!monster.isDead}
           onAbandon={spawnMonster}
           onWipeAll={wipeAll}
+          onSignOut={handleSignOut}
           onClose={() => setShowSettings(false)}
         />
       )}

@@ -4,10 +4,11 @@ interface Props {
   hasMonster: boolean;
   onAbandon:  () => void;
   onWipeAll:  () => void;
+  onSignOut:  () => void;
   onClose:    () => void;
 }
 
-export default function SettingsPanel({ hasMonster, onAbandon, onWipeAll, onClose }: Props) {
+export default function SettingsPanel({ hasMonster, onAbandon, onWipeAll, onSignOut, onClose }: Props) {
   function handleAbandon() {
     if (confirm("Abandon your monster? A new egg will start its timer from scratch. Your inventory is kept.")) {
       onAbandon();
@@ -78,6 +79,19 @@ export default function SettingsPanel({ hasMonster, onAbandon, onWipeAll, onClos
             className="mt-2 px-4 py-3 border border-monster-border bg-monster-panel text-monster-text uppercase tracking-widest hover:bg-monster-border active:scale-95 transition-all"
           >
             Wipe All Data
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2 border border-monster-border p-4">
+          <p style={{ fontSize: "8px" }} className="text-monster-text uppercase tracking-widest">
+            Account
+          </p>
+          <button
+            onClick={onSignOut}
+            style={{ fontSize: "7px" }}
+            className="mt-2 px-4 py-3 border border-monster-border bg-monster-panel text-monster-muted uppercase tracking-widest hover:bg-monster-border active:scale-95 transition-all"
+          >
+            Sign Out
           </button>
         </div>
 

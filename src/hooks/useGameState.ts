@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { Monster, TrainingType, AnimationState } from "@/types/game";
 import type { Inventory, ItemId } from "@/types/items";
 import {
-  createMonster, loadMonster, saveMonster, clearMonster,
+  createMonster, migrateMonster,
   cleanPoop, trainMonster, petMonster, applyDecay, applyItem,
   grantExp, startAdventure as doStartAdventure,
   sleepMonster as doSleep, wakeMonster as doWake,
@@ -12,12 +12,11 @@ import {
 import { resolveAdventure, type AdventureResultData } from "@/lib/adventureEngine";
 import type { WildMonster, BattleResult } from "@/lib/battleEngine";
 import {
-  loadInventory, saveInventory, consumeSlot, deleteSlot,
-  clearInventory, createDefaultInventory, addToInventory,
+  consumeSlot, deleteSlot, createDefaultInventory, addToInventory,
 } from "@/lib/inventory";
 import { ITEM_DEFS } from "@/types/items";
-import { loadCoins, saveCoins, clearCoins } from "@/lib/coins";
 import { STARTING_COINS, ADVENTURE_DURATION_MS } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/client";
 
 // ── state ──────────────────────────────────────────────────────────────────
 
@@ -93,7 +92,7 @@ function applyAdventureResult(state: State, monster: Monster): State {
   let itemObtained = false;
   if (outcome.itemFound) {
     const newInv = addToInventory(inv, outcome.itemFound);
-    if (newInv) { inv = newInv; itemObtained = true; saveInventory(inv); }
+    if (newInv) { inv = newInv; itemObtained = true; }
   }
 
   const result: AdventureResultData = { ...outcome, itemObtained };
@@ -138,7 +137,6 @@ function reducer(state: State, action: Action): State {
       if (!result) return state;
       const itemResult = applyItem(state.monster, result.itemId);
       if (!itemResult.ok) return { ...state, message: itemResult.message };
-      saveInventory(result.inv);
       const anim = result.itemId === "kibble" ? "eating"
                  : result.itemId === "treat"   ? "happy"
                  : "happy";
@@ -155,7 +153,6 @@ function reducer(state: State, action: Action): State {
       if (state.coins < action.price) return { ...state, message: "Not enough coins!" };
       const inv = addToInventory(state.inventory, action.itemId);
       if (!inv) return { ...state, message: "Bag is full!" };
-      saveInventory(inv);
       return { ...state, inventory: inv, coins: state.coins - action.price };
     }
 
@@ -171,14 +168,12 @@ function reducer(state: State, action: Action): State {
       if (slotIdx === -1) return { ...state, message: "You need a Name Change item from the shop!" };
       const result = consumeSlot(state.inventory, slotIdx);
       if (!result) return state;
-      saveInventory(result.inv);
       const m = { ...state.monster, name: action.name };
       return { ...state, monster: m, inventory: result.inv, message: `Renamed to ${action.name}!` };
     }
 
     case "DELETE_ITEM": {
       const inv = deleteSlot(state.inventory, action.slotIndex);
-      saveInventory(inv);
       return { ...state, inventory: inv };
     }
 
@@ -226,7 +221,7 @@ function reducer(state: State, action: Action): State {
       if (action.useFirstAidKit) {
         const slotIdx = inv.findIndex(s => s?.itemId === "first_aid_kit");
         const result  = consumeSlot(inv, slotIdx);
-        if (result) { inv = result.inv; saveInventory(inv); }
+        if (result) { inv = result.inv; }
         m = { ...m, isInjured: false };
       }
       return {
@@ -260,7 +255,6 @@ function reducer(state: State, action: Action): State {
       if (!slot) return state;
       const sellPrice = Math.floor(ITEM_DEFS[slot.itemId].price / 2);
       const inv = deleteSlot(state.inventory, action.slotIndex);
-      saveInventory(inv);
       return { ...state, inventory: inv, coins: state.coins + sellPrice };
     }
 
@@ -279,16 +273,11 @@ function reducer(state: State, action: Action): State {
     }
 
     case "RESET": {
-      clearMonster();
       return { ...state, monster: null, anim: "idle", message: "", showTrain: false };
     }
 
     case "WIPE_ALL": {
-      clearMonster();
-      clearInventory();
-      clearCoins();
       const freshInv = createDefaultInventory();
-      saveInventory(freshInv);
       return { ...state, monster: null, inventory: freshInv, coins: STARTING_COINS, anim: "idle", message: "", showTrain: false };
     }
 
@@ -320,25 +309,45 @@ const INITIAL: State = {
 
 export function useGameState() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
-  const animTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On mount: load monster + inventory + coins
+  // On mount: load from Supabase
   useEffect(() => {
-    const m   = loadMonster();
-    const inv = loadInventory();
-    const c   = loadCoins();
-    dispatch({ type: "LOAD", monster: m, inventory: inv, coins: c });
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      const { data } = await supabase
+        .from("game_saves")
+        .select("monster, inventory, coins")
+        .eq("user_id", user.id)
+        .single();
+      if (cancelled) return;
+      const m   = data?.monster   ? migrateMonster(data.monster)   : null;
+      const inv = data?.inventory ?? createDefaultInventory();
+      const c   = data?.coins     ?? STARTING_COINS;
+      dispatch({ type: "LOAD", monster: m, inventory: inv, coins: c });
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  // Persist monster whenever it changes
+  // Debounced save to Supabase on any state change
   useEffect(() => {
-    if (state.monster) saveMonster(state.monster);
-  }, [state.monster]);
-
-  // Persist coins and broadcast to header display
-  useEffect(() => {
-    if (!state.isLoading) saveCoins(state.coins);
-  }, [state.coins, state.isLoading]);
+    if (state.isLoading) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from("game_saves").upsert(
+        { user_id: user.id, monster: state.monster, inventory: state.inventory, coins: state.coins },
+        { onConflict: "user_id" }
+      );
+    }, 1000);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [state.monster, state.inventory, state.coins, state.isLoading]);
 
   // 1-second decay tick
   const monsterId   = state.monster?.id;
@@ -369,7 +378,6 @@ export function useGameState() {
 
   const spawnMonster = useCallback(() => {
     const m = createMonster();
-    saveMonster(m);
     dispatch({ type: "NEW_MONSTER", monster: m });
   }, []);
 

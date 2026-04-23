@@ -534,43 +534,37 @@ export function saveMonster(m: Monster) {
   localStorage.setItem(KEY, JSON.stringify(m));
 }
 
+export function migrateMonster(raw: unknown): Monster {
+  const m = raw as Monster;
+  if (!m.hatchTime || isNaN(m.hatchTime)) { m.hatchTime = Date.now(); m.isHatched = true; }
+  if (m.isHatched           === undefined) m.isHatched           = true;
+  if (m.rpg.end             === undefined) m.rpg.end             = 5;
+  if (m.rpg.str             === undefined) m.rpg.str             = 5;
+  if (m.lastHungerEnergyDrain === undefined) m.lastHungerEnergyDrain = null;
+  if ((m as unknown as Record<string, unknown>).lastPoopTime !== undefined)
+    delete (m as unknown as Record<string, unknown>).lastPoopTime;
+  if (m.mealsPending        === undefined) m.mealsPending        = 0;
+  if (m.nextPoopTime        === undefined) m.nextPoopTime        = null;
+  if ((m as unknown as Record<string, unknown>).isShiny === undefined) m.isShiny = false;
+  if (m.isSick              === undefined) m.isSick              = false;
+  if (m.sickStart           === undefined) m.sickStart           = null;
+  if (m.dirtyStart          === undefined) m.dirtyStart          = null;
+  if (m.lastPetTime         === undefined) m.lastPetTime         = null;
+  if (m.hasBeenRenamed      === undefined) m.hasBeenRenamed      = false;
+  if (m.isAdventuring       === undefined) m.isAdventuring       = false;
+  if (m.adventureStart      === undefined) m.adventureStart      = null;
+  if (m.isInjured           === undefined) m.isInjured           = false;
+  if (m.injuredHealStart    === undefined) m.injuredHealStart    = null;
+  if (m.isSleeping          === undefined) m.isSleeping          = false;
+  return applyDecay(m, Date.now());
+}
+
 export function loadMonster(): Monster | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
-    const m = JSON.parse(raw) as Monster;
-    // Migrate saves created before the egg system
-    if (!m.hatchTime || isNaN(m.hatchTime)) {
-      m.hatchTime = Date.now();
-      m.isHatched = true;
-    }
-    if (m.isHatched === undefined) m.isHatched = true;
-    // Migrate saves created before the endurance stat
-    if (m.rpg.end === undefined) m.rpg.end = 5;
-    // Migrate saves created before the strength stat
-    if (m.rpg.str === undefined) m.rpg.str = 5;
-    // Migrate saves created before hunger energy drain tracking
-    if (m.lastHungerEnergyDrain === undefined) m.lastHungerEnergyDrain = null;
-    // Migrate saves that used lastPoopTime instead of digestion queue
-    if ((m as unknown as Record<string, unknown>).lastPoopTime !== undefined) {
-      delete (m as unknown as Record<string, unknown>).lastPoopTime;
-    }
-    if (m.mealsPending === undefined) m.mealsPending = 0;
-    if (m.nextPoopTime === undefined) m.nextPoopTime = null;
-    if ((m as unknown as Record<string, unknown>).isShiny === undefined) m.isShiny = false;
-    if (m.isSick      === undefined) m.isSick      = false;
-    if (m.sickStart   === undefined) m.sickStart   = null;
-    if (m.dirtyStart  === undefined) m.dirtyStart  = null;
-    if (m.lastPetTime      === undefined) m.lastPetTime      = null;
-    if (m.hasBeenRenamed  === undefined) m.hasBeenRenamed   = false;
-    if (m.isAdventuring   === undefined) m.isAdventuring    = false;
-    if (m.adventureStart  === undefined) m.adventureStart   = null;
-    if (m.isInjured         === undefined) m.isInjured         = false;
-    if (m.injuredHealStart  === undefined) m.injuredHealStart  = null;
-    if (m.isSleeping        === undefined) m.isSleeping        = false;
-    // Apply offline decay before returning
-    return applyDecay(m, Date.now());
+    return migrateMonster(JSON.parse(raw));
   } catch {
     return null;
   }

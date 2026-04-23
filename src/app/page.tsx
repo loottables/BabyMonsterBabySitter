@@ -1,10 +1,8 @@
-import GameUI from "@/components/GameUI";
-import CoinsDisplay from "@/components/CoinsDisplay";
+import GameGate from "@/components/GameGate";
 
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col">
-      {/* Header */}
       <header className="border-b border-monster-border py-4 px-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <span className="text-2xl">👾</span>
@@ -19,17 +17,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Coins */}
-      <div className="flex justify-center pt-4">
-        <CoinsDisplay />
-      </div>
+      <GameGate />
 
-      {/* Game */}
-      <div className="flex-1 flex flex-col py-8">
-        <GameUI />
-      </div>
-
-      {/* Footer */}
       <footer className="border-t border-monster-border py-3 px-6 text-center text-xs text-monster-muted shrink-0">
         Your monster keeps aging even when you&apos;re away. Don&apos;t neglect them.
       </footer>
