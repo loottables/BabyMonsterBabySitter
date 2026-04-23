@@ -50,6 +50,9 @@ export const CLEAN_HAPPINESS_GAIN = 8;
 export const BASE_EXP_TO_NEXT = 60;
 export const EXP_SCALE = 1.4;
 
+// Strength stat — HP bonus per str point
+export const STR_HP_MULTIPLIER = 3;
+
 // Starter RPG stats (fallback / migration only — new monsters use randomStarterRpg)
 export const STARTER_RPG = {
   hp: 20,
@@ -58,6 +61,7 @@ export const STARTER_RPG = {
   def: 5,
   agi: 5,
   spd: 5,
+  str: 5,
   end: 5,
   level: 1,
   exp: 0,
@@ -90,6 +94,16 @@ export const TRAINING_EXERCISES: TrainingExercise[] = [
     name: "Sprint",
     description: "Sharpens reflexes",
     statLabel: "AGI +2 / SPD +1 / EXP 1%",
+    energyCost: 1,
+    hungerCost: 15,
+    statGain: 2,
+    expPct: 0.01,
+  },
+  {
+    id: "weights",
+    name: "Weightlifting",
+    description: "Builds raw mass and toughness",
+    statLabel: "STR +2 / Max HP +6",
     energyCost: 1,
     hungerCost: 15,
     statGain: 2,

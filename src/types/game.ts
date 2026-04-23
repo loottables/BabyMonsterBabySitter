@@ -1,4 +1,4 @@
-export type TrainingType = "pushups" | "situps" | "sprint" | "endurance";
+export type TrainingType = "pushups" | "situps" | "sprint" | "endurance" | "weights";
 
 export interface RPGStats {
   hp: number;
@@ -7,6 +7,7 @@ export interface RPGStats {
   def: number;
   agi: number;
   spd: number;
+  str: number;  // strength  — each pt adds STR_HP_MULTIPLIER to maxHp
   end: number;  // endurance — each 5 pts adds 1 to max energy
   level: number;
   exp: number;

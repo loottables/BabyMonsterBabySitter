@@ -27,6 +27,7 @@ import {
   CLEAN_HAPPINESS_GAIN,
   BASE_EXP_TO_NEXT,
   EXP_SCALE,
+  STR_HP_MULTIPLIER,
   TRAINING_EXERCISES,
   EGG_HATCH_MS,
   SHINY_CHANCE,
@@ -54,7 +55,8 @@ function levelUp(rpg: RPGStats): RPGStats {
     r.level    += 1;
     r.expToNext = Math.round(r.expToNext * EXP_SCALE);
     // Bonus stats on level up
-    r.maxHp += 5;
+    r.str   += 1;
+    r.maxHp += 5 + STR_HP_MULTIPLIER; // 5 base + 3 from str gain
     r.hp     = r.maxHp; // heal on level up
     r.atk   += 1;
     r.def   += 1;
@@ -67,23 +69,27 @@ function levelUp(rpg: RPGStats): RPGStats {
 // ── creation ───────────────────────────────────────────────────────────────
 
 function randomStarterRpg(): RPGStats {
-  // atk + def + agi + spd + end = 25, each ≥ 1
-  // Broken-stick: 4 cut points over [0, 20] divide the bonus pool
-  const pool = 20; // 25 total − 5 base (1 each)
+  // str + atk + def + agi + spd + end = 30, each ≥ 1
+  // Broken-stick: 5 cut points over [0, 24] divide the bonus pool
+  const pool = 24; // 30 total − 6 base (1 each)
   const cuts = [
     Math.floor(Math.random() * (pool + 1)),
     Math.floor(Math.random() * (pool + 1)),
     Math.floor(Math.random() * (pool + 1)),
     Math.floor(Math.random() * (pool + 1)),
+    Math.floor(Math.random() * (pool + 1)),
   ].sort((a, b) => a - b);
-  const maxHp = 18 + Math.floor(Math.random() * 8); // 18–25
+  const str    = 1 + cuts[0];
+  const baseHp = 18 + Math.floor(Math.random() * 8); // 18–25
+  const maxHp  = baseHp + str * STR_HP_MULTIPLIER;
   return {
     hp: maxHp, maxHp,
-    atk: 1 + cuts[0],
-    def: 1 + (cuts[1] - cuts[0]),
-    agi: 1 + (cuts[2] - cuts[1]),
-    spd: 1 + (cuts[3] - cuts[2]),
-    end: 1 + (pool - cuts[3]),
+    str,
+    atk: 1 + (cuts[1] - cuts[0]),
+    def: 1 + (cuts[2] - cuts[1]),
+    agi: 1 + (cuts[3] - cuts[2]),
+    spd: 1 + (cuts[4] - cuts[3]),
+    end: 1 + (pool - cuts[4]),
     level: 1, exp: 0, expToNext: BASE_EXP_TO_NEXT,
   };
 }
@@ -482,6 +488,13 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
     case "situps":    rpg.def += exercise.statGain; break;
     case "sprint":    rpg.agi += exercise.statGain; rpg.spd += 1; break;
     case "endurance": rpg.end += exercise.statGain; break;
+    case "weights": {
+      const hpGain = exercise.statGain * STR_HP_MULTIPLIER;
+      rpg.str   += exercise.statGain;
+      rpg.maxHp += hpGain;
+      rpg.hp     = Math.min(rpg.hp + hpGain, rpg.maxHp);
+      break;
+    }
   }
 
   const expGained = Math.floor(rpg.expToNext * exercise.expPct);
@@ -535,6 +548,8 @@ export function loadMonster(): Monster | null {
     if (m.isHatched === undefined) m.isHatched = true;
     // Migrate saves created before the endurance stat
     if (m.rpg.end === undefined) m.rpg.end = 5;
+    // Migrate saves created before the strength stat
+    if (m.rpg.str === undefined) m.rpg.str = 5;
     // Migrate saves created before hunger energy drain tracking
     if (m.lastHungerEnergyDrain === undefined) m.lastHungerEnergyDrain = null;
     // Migrate saves that used lastPoopTime instead of digestion queue

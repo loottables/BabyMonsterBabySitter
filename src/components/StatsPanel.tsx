@@ -138,6 +138,7 @@ export default function StatsPanel({ monster }: Props) {
           })()}
         </div>
 
+        <RPGRow label="STR" value={rpg.str} />
         <RPGRow label="ATK" value={rpg.atk} />
         <RPGRow label="DEF" value={rpg.def} />
         <RPGRow label="AGI" value={rpg.agi} />

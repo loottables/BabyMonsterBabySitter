@@ -21,6 +21,7 @@ export interface WildMonster {
 export interface BattleRound {
   attacker:      "player" | "wild";
   hit:           boolean;
+  dodged:        boolean;
   damage:        number;
   playerHpAfter: number;
   wildHpAfter:   number;
@@ -82,6 +83,10 @@ export function simulateBattle(
     return Math.min(0.97, Math.max(0.55, 0.85 + (agi - defAgi) * 0.015));
   }
 
+  function dodgeChance(defSpd: number, atkSpd: number): number {
+    return Math.min(0.50, Math.max(0, (defSpd - atkSpd) * 0.02));
+  }
+
   while (pHp > 0 && wHp > 0 && rounds.length < 100) {
     // Higher SPD goes first; tie = random
     const playerFirst = playerRpg.spd > wildRpg.spd ||
@@ -98,12 +103,13 @@ export function simulateBattle(
       const defStats  = isPlayer ? wildRpg   : playerRpg;
 
       const hit    = rng() < hitChance(atkStats.agi, defStats.agi);
-      const damage = hit ? calcDamage(atkStats.atk, defStats.def) : 0;
+      const dodged = hit && rng() < dodgeChance(defStats.spd, atkStats.spd);
+      const damage = hit && !dodged ? calcDamage(atkStats.atk, defStats.def) : 0;
 
       if (isPlayer) wHp = Math.max(0, wHp - damage);
       else          pHp = Math.max(0, pHp - damage);
 
-      rounds.push({ attacker, hit, damage, playerHpAfter: pHp, wildHpAfter: wHp });
+      rounds.push({ attacker, hit, dodged, damage, playerHpAfter: pHp, wildHpAfter: wHp });
     }
   }
 

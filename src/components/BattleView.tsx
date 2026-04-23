@@ -132,10 +132,12 @@ export default function BattleView({ encounter, playerMonster, onComplete }: Pro
 
     const round   = rounds[idx];
     const atkName = round.attacker === "player" ? playerMonster.name : wildMonster.name;
+    const defName = round.attacker === "player" ? wildMonster.name   : playerMonster.name;
     setRoundIdx(idx);
-    setStatusMsg(round.hit
-      ? `${atkName} attacks!${round.damage > 0 ? ` (-${round.damage})` : ""}`
-      : `${atkName} missed!`
+    setStatusMsg(
+      round.dodged ? `${defName} dodged!`
+      : round.hit  ? `${atkName} attacks!${round.damage > 0 ? ` (-${round.damage})` : ""}`
+      :              `${atkName} missed!`
     );
     setAttacking(round.attacker);
 
