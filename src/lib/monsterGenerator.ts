@@ -853,7 +853,7 @@ function addBlush(g: PixelGrid, cx: number, cy: number, hw: number, hh: number, 
 
 // ── external feature helpers ───────────────────────────────────────────────
 
-type EarStyle = "pointy" | "round" | "floppy";
+type EarStyle = "pointy" | "round" | "floppy" | "tufted" | "bat" | "fin";
 
 function addEar(
   g: PixelGrid,
@@ -867,7 +867,6 @@ function addEar(
 
   switch (style) {
     case "pointy":
-      // 4-px wide base tapering to a point
       fillRect(g, p.x - 2, p.y - 2, 4, 2, col);
       fillRect(g, p.x - 1, p.y - 4, 3, 2, col);
       fillRect(g, p.x,     p.y - 6, 2, 2, col);
@@ -879,9 +878,43 @@ function addEar(
       break;
 
     case "floppy": {
-      // droopy ear — 4px thick horizontal then drops down
       fillRect(g, p.x + Math.min(0, s * 4), p.y - 2, 6, 4, col);
       fillRect(g, p.x + s * 3,              p.y + 1,  4, 5, col);
+      break;
+    }
+
+    case "tufted": {
+      // Pointy ear with a lighter inner tuft mark
+      fillRect(g, p.x - 2, p.y - 2, 4, 2, col);
+      fillRect(g, p.x - 1, p.y - 4, 3, 2, col);
+      fillRect(g, p.x,     p.y - 6, 2, 2, col);
+      set(g, p.x + (s > 0 ? 1 : 0), p.y - 7, dark);
+      const light = Math.min(252, col + 35);
+      set(g, p.x, p.y - 3, light);
+      set(g, p.x, p.y - 4, light);
+      break;
+    }
+
+    case "bat": {
+      // Wide triangular bat-wing ear with inner concave notch
+      fillRect(g, p.x - 3, p.y - 2, 7, 2, col);
+      fillRect(g, p.x - 2, p.y - 4, 5, 2, col);
+      fillRect(g, p.x - 1, p.y - 5, 3, 1, col);
+      set(g, p.x,     p.y - 6, col);
+      set(g, p.x + 1, p.y - 6, dark);
+      // Concave notch on inner side
+      set(g, p.x - s, p.y - 3, dark);
+      set(g, p.x - s, p.y - 4, dark);
+      break;
+    }
+
+    case "fin": {
+      // Tall narrow fin pointing straight up
+      fillRect(g, p.x - 1, p.y - 2, 3, 2, col);
+      fillRect(g, p.x,     p.y - 5, 2, 3, col);
+      set(g, p.x,     p.y - 6, col);
+      set(g, p.x + 1, p.y - 6, col);
+      set(g, p.x,     p.y - 7, dark);
       break;
     }
   }
@@ -924,11 +957,59 @@ function addAntenna(g: PixelGrid, p: Pt, style: AntennaStyle, col: number) {
 
 function addHorn(g: PixelGrid, p: Pt, side: "left" | "right", col: number) {
   const dark = Math.max(2, col - 40);
-  // 4-px wide base tapering to tip
   fillRect(g, p.x - 2, p.y - 2, 4, 2, col);
   fillRect(g, p.x - 1, p.y - 4, 3, 2, col);
   fillRect(g, p.x - 1, p.y - 6, 2, 2, col);
   set(g, p.x,          p.y - 7, dark);
+}
+
+function addSingleHorn(g: PixelGrid, p: Pt, col: number) {
+  // Taller centered unicorn horn
+  const dark = Math.max(2, col - 40);
+  fillRect(g, p.x - 2, p.y - 2, 5, 2, col);
+  fillRect(g, p.x - 1, p.y - 4, 4, 2, col);
+  fillRect(g, p.x - 1, p.y - 6, 3, 2, col);
+  fillRect(g, p.x,     p.y - 8, 2, 2, col);
+  set(g, p.x,          p.y - 9, dark);
+}
+
+function addCrown(g: PixelGrid, p: Pt, col: number) {
+  const dark = Math.max(2, col - 40);
+  // Band
+  fillRect(g, p.x - 5, p.y - 2, 11, 3, col);
+  // Left point
+  fillRect(g, p.x - 4, p.y - 4, 2, 2, col);
+  // Center point (tallest)
+  fillRect(g, p.x - 1, p.y - 5, 3, 3, col);
+  // Right point
+  fillRect(g, p.x + 3, p.y - 4, 2, 2, col);
+  // Dark tips
+  set(g, p.x - 4, p.y - 5, dark); set(g, p.x - 3, p.y - 5, dark);
+  set(g, p.x,     p.y - 6, dark); set(g, p.x + 1, p.y - 6, dark);
+  set(g, p.x + 3, p.y - 5, dark); set(g, p.x + 4, p.y - 5, dark);
+}
+
+function addCrest(g: PixelGrid, p: Pt, hw: number, col: number, rng: RNG) {
+  // Mohawk row of alternating-height spikes along the top
+  const dark = Math.max(2, col - 50);
+  const count   = rng.nextInt(3, 5);
+  const spread  = Math.min(Math.round(hw * 0.6), 10);
+  for (let i = 0; i < count; i++) {
+    const t  = count > 1 ? i / (count - 1) : 0.5;
+    const sx = Math.round(p.x - spread + t * spread * 2);
+    const h  = i % 2 === 0 ? 6 : 4;
+    fillRect(g, sx - 1, p.y - h, 2, h, dark);
+    set(g, sx, p.y - h - 1, dark);
+  }
+}
+
+function addRidge(g: PixelGrid, p: Pt, hw: number, col: number) {
+  // Flat dorsal fin running across the top of the head
+  const dark = Math.max(2, col - 40);
+  const rw   = Math.min(Math.round(hw * 0.65), 12);
+  fillRect(g, p.x - rw,                      p.y - 2, rw * 2,                     2, dark);
+  fillRect(g, p.x - Math.round(rw * 0.65),   p.y - 4, Math.round(rw * 1.3),       2, dark);
+  fillRect(g, p.x - Math.round(rw * 0.3),    p.y - 5, Math.round(rw * 0.6) + 1,   1, dark);
 }
 
 type ArmStyle = "stubby" | "claw" | "long" | "wing";
@@ -1109,22 +1190,31 @@ export function generateMonster(seed: number): PixelGrid {
   }
 
   // ── ears ──
-  const earStyles: EarStyle[] = ["pointy", "round", "floppy"];
+  const earStyles: EarStyle[] = ["pointy", "round", "floppy", "tufted", "bat", "fin"];
   const earStyle = rng.pick(earStyles);
   const hasEarL = rng.nextBool(0.65);
   const hasEarR = rng.nextBool(0.65);
   if (hasEarL) addEar(g, attach.topLeft,  "left",  earStyle, base);
   if (hasEarR) addEar(g, attach.topRight, "right", earStyle, base);
 
-  // ── top accessories (antenna OR horns, not both) ──
+  // ── top accessories ──
   const topRoll = rng.next();
-  if (topRoll < 0.30) {
+  if (topRoll < 0.20) {
     const antennaStyles: AntennaStyle[] = ["ball", "fork", "star"];
     addAntenna(g, attach.top, rng.pick(antennaStyles), base);
-  } else if (topRoll < 0.52) {
+  } else if (topRoll < 0.35) {
     addHorn(g, attach.topLeft,  "left",  base);
     addHorn(g, attach.topRight, "right", base);
+  } else if (topRoll < 0.45) {
+    addSingleHorn(g, attach.top, base);
+  } else if (topRoll < 0.55) {
+    addCrown(g, attach.top, base);
+  } else if (topRoll < 0.65) {
+    addCrest(g, attach.top, hw, base, rng);
+  } else if (topRoll < 0.73) {
+    addRidge(g, attach.top, hw, base);
   }
+  // else ~27%: nothing
 
   // ── arms ──
   const armStyles: ArmStyle[] = ["stubby", "claw", "long", "wing"];
