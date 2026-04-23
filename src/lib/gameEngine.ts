@@ -288,9 +288,10 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
     m.care.happiness = clamp(m.care.happiness - INJURED_HAPPINESS_DRAIN_PER_MIN * minutes);
   }
 
-  // HP regeneration — paused while sick or injured
+  // HP regeneration — paused while sick or injured; doubled when happy + clean ≥ 90
   if (!m.isDead && !m.isSick && !m.isInjured && m.rpg.hp < m.rpg.maxHp) {
-    const regenPerMin = m.rpg.maxHp * HP_REGEN_PCT_PER_MIN;
+    const wellCared   = m.care.happiness >= 50 && m.care.cleanliness >= 50 && m.care.hunger >= 50;
+    const regenPerMin = m.rpg.maxHp * HP_REGEN_PCT_PER_MIN * (wellCared ? 2 : 1);
     m.rpg.hp = Math.min(m.rpg.maxHp, m.rpg.hp + regenPerMin * minutes);
   }
 
@@ -437,9 +438,8 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
     case "endurance": rpg.end += exercise.statGain; break;
   }
 
-  const pct    = Math.random() * (exercise.expPctMax - exercise.expPctMin) + exercise.expPctMin;
-  const expRaw = Math.floor(monster.rpg.exp * pct);
-  rpg.exp += Math.max(3, expRaw); // floor of 3 so early-game monsters always gain something
+  const expGained = Math.floor(rpg.expToNext * exercise.expPct);
+  rpg.exp += expGained;
   rpg      = levelUp(rpg);
 
   const maxEnergy = 5 + Math.floor(rpg.end / 5);

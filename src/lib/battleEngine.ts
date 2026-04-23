@@ -115,11 +115,11 @@ export function simulateBattle(
   if (winner === "player") {
     const levelDiff = playerLevel - wildLevel;
     if (wildLevel === 1) {
-      expGained = Math.max(3, Math.floor(expToNext * 0.01));
+      expGained = 10;
     } else if (levelDiff >= 3) {
-      expGained = Math.max(3, Math.floor(expToNext * (rng() * 0.02 + 0.02)));  // 2–4%
+      expGained = Math.floor(rng() * 10) + 11;   // 11–20
     } else {
-      expGained = Math.max(3, Math.floor(expToNext * (rng() * 0.10 + 0.08)));  // 8–18%
+      expGained = Math.floor(rng() * 36) + 25;   // 25–60
     }
     coinsGained = Math.floor(wildLevel * (rng() * 6 + 3));  // level × 3–9 coins
   }

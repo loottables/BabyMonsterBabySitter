@@ -395,14 +395,14 @@ export function resolveAdventure(
   let expGained  = 0;
   let coinsFound = 0;
   if (event === "both") {
-    expGained = 10 + Math.floor(expToNext * (rng() * 0.04 + 0.01));
+    expGained = Math.floor(rng() * 15) + 1;          // 1–15
   } else if (event === "exp") {
-    expGained = Math.floor(expToNext * (rng() * 0.10 + 0.08));
+    expGained = Math.floor(rng() * 26) + 15;          // 15–40
   } else if (event === "treasure") {
     coinsFound = Math.floor(rng() * 100) + 1;
   } else if (event === "coins_exp") {
     coinsFound = Math.floor(rng() * 35) + 1;
-    expGained  = Math.floor(expToNext * (rng() * 0.04 + 0.01));
+    expGained  = Math.floor(rng() * 15) + 1;          // 1–15
   }
 
   // Build narrative

@@ -58,7 +58,8 @@ export default function StatsPanel({ monster }: Props) {
   const hpLow       = hpPct <= 25;
   const hpColor     = hpPct > 50 ? undefined : hpPct > 25 ? "#d8d8a8" : "#d8a8a8";
   const canRegenHp  = !monster.isSick && !monster.isInjured;
-  const hpRegenPerMin = rpg.maxHp * HP_REGEN_PCT_PER_MIN;
+  const wellCared   = care.happiness >= 50 && care.cleanliness >= 50 && care.hunger >= 50;
+  const hpRegenPerMin = rpg.maxHp * HP_REGEN_PCT_PER_MIN * (wellCared ? 2 : 1);
   const secsToFull  = rpg.hp < rpg.maxHp
     ? Math.ceil((rpg.maxHp - rpg.hp) / hpRegenPerMin * 60)
     : 0;
@@ -146,9 +147,6 @@ export default function StatsPanel({ monster }: Props) {
         </div>
       </section>
 
-      <div className="text-center text-monster-muted" style={{ fontSize: "6px" }}>
-        DAY {monster.age} / {monster.name.toUpperCase()}
-      </div>
     </div>
   );
 }

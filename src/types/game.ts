@@ -67,8 +67,7 @@ export interface TrainingExercise {
   energyCost: number;
   hungerCost: number;
   statGain: number;
-  expPctMin: number;  // minimum exp gain as fraction of current exp (e.g. 0.01 = 1%)
-  expPctMax: number;  // maximum exp gain as fraction of current exp
+  expPct: number;     // fixed exp gain as fraction of expToNext (0 = no exp)
 }
 
 export type AnimationState =
