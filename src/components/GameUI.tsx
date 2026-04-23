@@ -75,7 +75,7 @@ export default function GameUI() {
   const {
     monster, inventory, coins, anim, message, isLoading, showTrain,
     adventureResult, pendingEncounter, activeBattle,
-    spawnMonster, useItem, deleteItem, buyItem, pet, clean, train, toggleTrain,
+    spawnMonster, useItem, deleteItem, buyItem, sellItem, pet, clean, train, toggleTrain,
     adventure, dismissAdventureResult, runFromBattle, acceptBattle, completeBattle,
     rename, wipeAll,
   } = useGameState();
@@ -296,7 +296,9 @@ export default function GameUI() {
         <ShopPanel
           coins={coins}
           hasBeenRenamed={monster.hasBeenRenamed}
+          inventory={inventory}
           onBuy={buyItem}
+          onSell={sellItem}
           onClose={() => setShowShop(false)}
         />
       )}

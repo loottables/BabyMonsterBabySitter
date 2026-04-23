@@ -14,6 +14,7 @@ import {
   loadInventory, saveInventory, consumeSlot, deleteSlot,
   clearInventory, createDefaultInventory, addToInventory,
 } from "@/lib/inventory";
+import { ITEM_DEFS } from "@/types/items";
 import { loadCoins, saveCoins, clearCoins } from "@/lib/coins";
 import { STARTING_COINS, ADVENTURE_DURATION_MS } from "@/lib/constants";
 
@@ -57,6 +58,7 @@ type Action =
   | { type: "RUN_FROM_BATTLE" }
   | { type: "ACCEPT_BATTLE";    useFirstAidKit: boolean }
   | { type: "COMPLETE_BATTLE" }
+  | { type: "SELL_ITEM";              slotIndex: number }
   | { type: "RESET" }
   | { type: "WIPE_ALL" }
   | { type: "SET_ANIM";               anim: AnimationState }
@@ -250,6 +252,15 @@ function reducer(state: State, action: Action): State {
       };
     }
 
+    case "SELL_ITEM": {
+      const slot = state.inventory[action.slotIndex];
+      if (!slot) return state;
+      const sellPrice = Math.floor(ITEM_DEFS[slot.itemId].price / 2);
+      const inv = deleteSlot(state.inventory, action.slotIndex);
+      saveInventory(inv);
+      return { ...state, inventory: inv, coins: state.coins + sellPrice };
+    }
+
     case "RESET": {
       clearMonster();
       return { ...state, monster: null, anim: "idle", message: "", showTrain: false };
@@ -348,6 +359,7 @@ export function useGameState() {
   const useItem    = useCallback((i: number) => dispatch({ type: "USE_ITEM",    slotIndex: i }), []);
   const deleteItem = useCallback((i: number) => dispatch({ type: "DELETE_ITEM", slotIndex: i }), []);
   const buyItem    = useCallback((itemId: ItemId, price: number) => dispatch({ type: "BUY_ITEM", itemId, price }), []);
+  const sellItem   = useCallback((i: number) => dispatch({ type: "SELL_ITEM",   slotIndex: i }), []);
   const rename     = useCallback((name: string) => dispatch({ type: "RENAME", name }), []);
   const pet        = useCallback(() => dispatch({ type: "PET" }), []);
   const clean      = useCallback(() => dispatch({ type: "CLEAN" }), []);
@@ -374,6 +386,7 @@ export function useGameState() {
     useItem,
     deleteItem,
     buyItem,
+    sellItem,
     rename,
     pet,
     clean,

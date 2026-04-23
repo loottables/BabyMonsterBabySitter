@@ -310,10 +310,13 @@ const SCENARIOS: Scenario[] = [
 
 // Items that can be found on adventures (weighted)
 const ADVENTURE_ITEM_POOL: { id: ItemId; weight: number }[] = [
-  { id: "kibble",       weight: 40 },
-  { id: "treat",        weight: 30 },
-  { id: "energy_drink", weight: 20 },
-  { id: "medicine",     weight: 10 },
+  { id: "kibble",        weight: 35 },
+  { id: "treat",         weight: 25 },
+  { id: "energy_drink",  weight: 18 },
+  { id: "medicine",      weight: 10 },
+  { id: "vaccine",       weight: 7  },
+  { id: "first_aid_kit", weight: 4  },
+  { id: "name_change",   weight: 1  },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -347,10 +350,10 @@ type EventType = "both" | "exp" | "treasure" | "coins_exp" | "wild_battle" | "qu
 const EVENT_WEIGHTS: { id: EventType; weight: number }[] = [
   { id: "both",        weight: 22 },
   { id: "exp",         weight: 27 },
-  { id: "treasure",    weight: 9  },
+  { id: "treasure",    weight: 10 },
   { id: "coins_exp",   weight: 12 },
   { id: "wild_battle", weight: 19 },
-  { id: "quiet",       weight: 11 },
+  { id: "quiet",       weight: 10 },
 ];
 
 export function resolveAdventure(
