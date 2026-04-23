@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function AdventureResultModal({ result, onClose }: Props) {
-  const { narrative, itemFound, itemObtained, expGained } = result;
+  const { narrative, itemFound, itemObtained, expGained, coinsFound } = result;
   const itemDef = itemFound ? ITEM_DEFS[itemFound] : null;
 
   return (
@@ -56,7 +56,12 @@ export default function AdventureResultModal({ result, onClose }: Props) {
               + {itemDef.name}{!itemObtained && " (bag full)"}
             </p>
           )}
-          {expGained === 0 && !itemFound && (
+          {coinsFound > 0 && (
+            <p style={{ fontSize: "7px" }} className="text-monster-text uppercase tracking-wide">
+              + {coinsFound} coins
+            </p>
+          )}
+          {expGained === 0 && !itemFound && coinsFound === 0 && (
             <p style={{ fontSize: "7px" }} className="text-monster-muted">
               Nothing this time.
             </p>

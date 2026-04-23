@@ -67,7 +67,7 @@ function applyAdventureResult(state: State, monster: Monster): State {
   }
 
   const result: AdventureResultData = { ...outcome, itemObtained };
-  return { ...state, monster: m, inventory: inv, adventureResult: result, anim: "happy" };
+  return { ...state, monster: m, inventory: inv, coins: state.coins + outcome.coinsFound, adventureResult: result, anim: "happy" };
 }
 
 // ── reducer ────────────────────────────────────────────────────────────────

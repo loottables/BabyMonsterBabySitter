@@ -414,8 +414,10 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
     case "endurance": rpg.end += exercise.statGain; break;
   }
 
-  rpg.exp += exercise.expGain;
-  rpg     = levelUp(rpg);
+  const pct    = Math.random() * (exercise.expPctMax - exercise.expPctMin) + exercise.expPctMin;
+  const expRaw = Math.floor(monster.rpg.exp * pct);
+  rpg.exp += Math.max(3, expRaw); // floor of 3 so early-game monsters always gain something
+  rpg      = levelUp(rpg);
 
   const maxEnergy = 5 + Math.floor(rpg.end / 5);
   let newEnergy   = clamp(monster.care.energy - exercise.energyCost, 0, maxEnergy);

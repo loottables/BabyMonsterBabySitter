@@ -40,7 +40,7 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     description: "Instantly restores all energy.",
     stats:       ["Restores energy to max"],
     actionLabel: "Give to",
-    price:       15,
+    price:       75,
   },
   medicine: {
     id:          "medicine",
