@@ -1107,21 +1107,66 @@ function addLeg(g: PixelGrid, p: Pt, side: "left" | "right", style: LegStyle, co
   }
 }
 
-function addTail(g: PixelGrid, p: Pt, col: number, rng: RNG) {
-  const curl = rng.nextInt(0, 1);
-  // 3-px wide diagonal tail base
-  fillRect(g, p.x + 1, p.y - 1, 3, 3, col);
-  fillRect(g, p.x + 3, p.y - 3, 3, 3, col);
-  fillRect(g, p.x + 5, p.y - 5, 3, 3, col);
-  if (curl === 0) {
-    // curl back
-    fillRect(g, p.x + 7, p.y - 5, 3, 3, col);
-    fillRect(g, p.x + 8, p.y - 3, 3, 3, col);
-    fillRect(g, p.x + 8, p.y - 1, 3, 3, col);
-  } else {
-    // straight tip
-    fillRect(g, p.x + 7, p.y - 7, 3, 3, col);
-    fillRect(g, p.x + 9, p.y - 9, 3, 3, col);
+type TailStyle = "straight" | "curved" | "curly" | "fluff" | "spike";
+
+function addTail(g: PixelGrid, p: Pt, side: "left" | "right", style: TailStyle, col: number) {
+  const s    = side === "left" ? -1 : 1;
+  const dark = Math.max(2, col - 40);
+
+  // Draw a w×w block at mirrored offset from p
+  const blk = (dx: number, dy: number, w: number, v: number) =>
+    fillRect(g, s === 1 ? p.x + dx : p.x - dx - w + 1, p.y + dy, w, w, v);
+  const px = (dx: number, dy: number, v: number) =>
+    set(g, p.x + s * dx, p.y + dy, v);
+
+  switch (style) {
+    case "straight": {
+      // 45° diagonal outward/up, tapers to a dark tip
+      blk(1, -1, 3, col);
+      blk(4, -4, 3, col);
+      blk(7, -7, 3, col);
+      blk(10, -9, 2, col);
+      px(11, -10, dark);
+      break;
+    }
+    case "curved": {
+      // Sweeps outward then arcs up and back like a scorpion tail
+      blk(1, -1, 3, col);
+      blk(4, -2, 3, col);
+      blk(7, -1, 3, col);
+      blk(9, -3, 2, col);
+      blk(9, -6, 2, col);
+      blk(8, -8, 2, col);
+      px(8, -9, dark);
+      break;
+    }
+    case "curly": {
+      // Tight corkscrew: goes up, arcs over, curls back inward
+      blk(1, -1, 3, col);
+      blk(3, -4, 3, col);
+      blk(4, -7, 2, col);
+      blk(3, -9, 2, col);
+      blk(1, -10, 2, col);
+      blk(0, -8, 2, col);
+      px(2, -7, dark);
+      break;
+    }
+    case "fluff": {
+      // Short chunky base + big pompom circle at the end
+      blk(1, -1, 3, col);
+      blk(3, -2, 3, col);
+      fillCircle(g, p.x + s * 7, p.y - 3, 4, col);
+      break;
+    }
+    case "spike": {
+      // Thick base tapering to a sharp horizontal point
+      blk(1, -1, 3, col);
+      blk(4, 0, 3, col);
+      blk(6, 0, 2, col);
+      blk(8, 1, 2, col);
+      px(10, 1, dark);
+      break;
+    }
   }
 }
 
@@ -1229,7 +1274,12 @@ export function generateMonster(seed: number): PixelGrid {
   addLeg(g, attach.bottomRight, "right", legStyle, base);
 
   // ── tail ──
-  if (rng.nextBool(0.45)) addTail(g, attach.bottomRight, base, rng);
+  if (rng.nextBool(0.45)) {
+    const tailSide    = rng.nextBool(0.5) ? "left" : "right" as const;
+    const tailStyles: TailStyle[] = ["straight", "curved", "curly", "fluff", "spike"];
+    const tailAttach  = tailSide === "left" ? attach.bottomLeft : attach.bottomRight;
+    addTail(g, tailAttach, tailSide, rng.pick(tailStyles), base);
+  }
 
   // ── back spikes ──
   if (rng.nextBool(0.30)) {
