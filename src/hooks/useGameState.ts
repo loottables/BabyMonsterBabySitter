@@ -68,7 +68,7 @@ type Action =
 
 function applyAdventureResult(state: State, monster: Monster): State {
   const seed    = monster.adventureStart!;
-  const outcome = resolveAdventure(monster.name, seed, monster.rpg.exp, monster.rpg.level, monster.rpg);
+  const outcome = resolveAdventure(monster.name, seed, monster.rpg.level, monster.rpg);
 
   const m = { ...monster, isAdventuring: false, adventureStart: null };
 

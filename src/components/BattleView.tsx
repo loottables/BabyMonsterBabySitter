@@ -8,6 +8,11 @@ import { wildToDisplayMonster } from "@/lib/battleEngine";
 
 const MonsterCanvas = dynamic(() => import("./MonsterCanvas"), { ssr: false });
 
+// MonsterCanvas always renders at 320×320 CSS px; scale it down for battle
+const SCALE   = 0.5;
+const VISUAL  = 320 * SCALE; // 160px
+const SHIFT   = 70;          // px the sprite lunges toward the opponent
+
 // ── HP bar ─────────────────────────────────────────────────────────────────
 
 function HpBar({ current, max }: { current: number; max: number }) {
@@ -41,18 +46,34 @@ interface CombatantProps {
 }
 
 function Combatant({ displayMonster, name, level, hp, maxHp, side, attacking }: CombatantProps) {
-  const shift = attacking ? (side === "left" ? 80 : -80) : 0;
+  const shift = attacking ? (side === "left" ? SHIFT : -SHIFT) : 0;
+
   return (
-    <div className="flex flex-col items-center gap-2 w-40">
+    <div className="flex flex-col items-center gap-2" style={{ width: VISUAL }}>
+      {/* Name + level — always static */}
       <p style={{ fontSize: "7px" }} className="text-monster-text uppercase tracking-wide text-center">
         {name} <span className="text-monster-muted">Lv.{level}</span>
       </p>
-      {/* Only the sprite shifts — name and HP bar stay fixed */}
-      <div style={{ width: 320, height: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ transform: `translateX(${shift}px)`, transition: "transform 250ms ease-out" }}>
-          <MonsterCanvas monster={displayMonster} anim="idle" />
+
+      {/* Container fixes the layout space; sprite shifts freely inside */}
+      <div style={{ width: VISUAL, height: VISUAL, position: "relative" }}>
+        <div
+          style={{
+            position:   "absolute",
+            top:        0,
+            left:       0,
+            transform:  `translateX(${shift}px)`,
+            transition: "transform 250ms ease-out",
+          }}
+        >
+          {/* Scale the 320px canvas down to VISUAL size, origin top-left */}
+          <div style={{ transform: `scale(${SCALE})`, transformOrigin: "top left", width: 320, height: 320 }}>
+            <MonsterCanvas monster={displayMonster} anim="idle" />
+          </div>
         </div>
       </div>
+
+      {/* HP bar — always static */}
       <HpBar current={hp} max={maxHp} />
     </div>
   );
@@ -61,9 +82,9 @@ function Combatant({ displayMonster, name, level, hp, maxHp, side, attacking }: 
 // ── Main component ─────────────────────────────────────────────────────────
 
 interface Props {
-  encounter:    PendingEncounter;
+  encounter:     PendingEncounter;
   playerMonster: Monster;
-  onComplete:   () => void;
+  onComplete:    () => void;
 }
 
 export default function BattleView({ encounter, playerMonster, onComplete }: Props) {
@@ -74,15 +95,15 @@ export default function BattleView({ encounter, playerMonster, onComplete }: Pro
   const initPlayerHp = playerMonster.rpg.hp;
   const initWildHp   = wildMonster.rpg.hp;
 
-  const [roundIdx,       setRoundIdx]       = useState(-1);
-  const [attacking,      setAttacking]      = useState<"player" | "wild" | null>(null);
-  const [playerHp,       setPlayerHp]       = useState(initPlayerHp);
-  const [wildHp,         setWildHp]         = useState(initWildHp);
-  const [battleDone,     setBattleDone]     = useState(false);
-  const [statusMsg,      setStatusMsg]      = useState("Battle start!");
+  const [roundIdx,   setRoundIdx]   = useState(-1);
+  const [attacking,  setAttacking]  = useState<"player" | "wild" | null>(null);
+  const [playerHp,   setPlayerHp]   = useState(initPlayerHp);
+  const [wildHp,     setWildHp]     = useState(initWildHp);
+  const [battleDone, setBattleDone] = useState(false);
+  const [statusMsg,  setStatusMsg]  = useState("Battle start!");
 
-  const skipRef     = useRef(false);
-  const timersRef   = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const skipRef   = useRef(false);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   function clearTimers() {
     timersRef.current.forEach(clearTimeout);
@@ -109,12 +130,11 @@ export default function BattleView({ encounter, playerMonster, onComplete }: Pro
       return;
     }
 
-    const round = rounds[idx];
-    setRoundIdx(idx);
-
+    const round   = rounds[idx];
     const atkName = round.attacker === "player" ? playerMonster.name : wildMonster.name;
+    setRoundIdx(idx);
     setStatusMsg(round.hit
-      ? `${atkName} attacks! ${round.damage > 0 ? `(-${round.damage})` : ""}`
+      ? `${atkName} attacks!${round.damage > 0 ? ` (-${round.damage})` : ""}`
       : `${atkName} missed!`
     );
     setAttacking(round.attacker);
@@ -132,7 +152,6 @@ export default function BattleView({ encounter, playerMonster, onComplete }: Pro
     }, 350);
   }
 
-  // Start animation after brief intro
   useEffect(() => {
     const t = setTimeout(() => animateRound(0), 800);
     return () => { clearTimers(); clearTimeout(t); };
@@ -154,8 +173,8 @@ export default function BattleView({ encounter, playerMonster, onComplete }: Pro
       className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-4"
       style={{ backgroundColor: "rgba(0,0,0,0.85)" }}
     >
-      {/* Monsters */}
-      <div className="flex items-end justify-center gap-24">
+      {/* Monsters — names and HP bars are static; only sprites shift */}
+      <div className="flex items-end justify-center gap-12">
         <Combatant
           displayMonster={playerMonster}
           name={playerMonster.name}
@@ -193,8 +212,8 @@ export default function BattleView({ encounter, playerMonster, onComplete }: Pro
         </div>
       )}
 
-      {/* Skip / done */}
-      {!battleDone ? (
+      {/* Skip button */}
+      {!battleDone && (
         <button
           onClick={handleSkip}
           style={{ fontSize: "7px" }}
@@ -202,7 +221,7 @@ export default function BattleView({ encounter, playerMonster, onComplete }: Pro
         >
           Skip
         </button>
-      ) : null}
+      )}
 
       {/* Win / Lose overlay */}
       {battleDone && (
