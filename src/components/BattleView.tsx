@@ -1,0 +1,249 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import type { Monster } from "@/types/game";
+import type { PendingEncounter } from "@/hooks/useGameState";
+import { wildToDisplayMonster } from "@/lib/battleEngine";
+
+const MonsterCanvas = dynamic(() => import("./MonsterCanvas"), { ssr: false });
+
+// ── HP bar ─────────────────────────────────────────────────────────────────
+
+function HpBar({ current, max }: { current: number; max: number }) {
+  const pct = Math.max(0, Math.min(100, Math.round((current / max) * 100)));
+  const color = pct > 50 ? "#a8d8a8" : pct > 25 ? "#d8d8a8" : "#d8a8a8";
+  return (
+    <div className="w-full flex flex-col gap-1">
+      <div className="w-full h-2 bg-monster-border overflow-hidden">
+        <div
+          className="h-full transition-all duration-300"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
+      </div>
+      <p style={{ fontSize: "6px" }} className="text-monster-muted tabular-nums text-right">
+        {current} / {max}
+      </p>
+    </div>
+  );
+}
+
+// ── Battle combatant panel ─────────────────────────────────────────────────
+
+interface CombatantProps {
+  displayMonster: Monster;
+  name:           string;
+  level:          number;
+  hp:             number;
+  maxHp:          number;
+  side:           "left" | "right";
+  attacking:      boolean;
+}
+
+function Combatant({ displayMonster, name, level, hp, maxHp, side, attacking }: CombatantProps) {
+  const shift = attacking ? (side === "left" ? 80 : -80) : 0;
+  return (
+    <div className="flex flex-col items-center gap-2 w-40">
+      <p style={{ fontSize: "7px" }} className="text-monster-text uppercase tracking-wide text-center">
+        {name} <span className="text-monster-muted">Lv.{level}</span>
+      </p>
+      {/* Only the sprite shifts — name and HP bar stay fixed */}
+      <div style={{ width: 320, height: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ transform: `translateX(${shift}px)`, transition: "transform 250ms ease-out" }}>
+          <MonsterCanvas monster={displayMonster} anim="idle" />
+        </div>
+      </div>
+      <HpBar current={hp} max={maxHp} />
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
+
+interface Props {
+  encounter:    PendingEncounter;
+  playerMonster: Monster;
+  onComplete:   () => void;
+}
+
+export default function BattleView({ encounter, playerMonster, onComplete }: Props) {
+  const { wildMonster, battleResult } = encounter;
+  const { rounds, winner }            = battleResult;
+  const wildDisplay                   = wildToDisplayMonster(wildMonster);
+
+  const initPlayerHp = playerMonster.rpg.hp;
+  const initWildHp   = wildMonster.rpg.hp;
+
+  const [roundIdx,       setRoundIdx]       = useState(-1);
+  const [attacking,      setAttacking]      = useState<"player" | "wild" | null>(null);
+  const [playerHp,       setPlayerHp]       = useState(initPlayerHp);
+  const [wildHp,         setWildHp]         = useState(initWildHp);
+  const [battleDone,     setBattleDone]     = useState(false);
+  const [statusMsg,      setStatusMsg]      = useState("Battle start!");
+
+  const skipRef     = useRef(false);
+  const timersRef   = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  function clearTimers() {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  }
+
+  function addTimer(fn: () => void, ms: number) {
+    const t = setTimeout(fn, ms);
+    timersRef.current.push(t);
+  }
+
+  function finishBattle() {
+    setPlayerHp(Math.max(1, battleResult.finalPlayerHp));
+    setWildHp(winner === "player" ? 0 : wildMonster.rpg.hp);
+    setAttacking(null);
+    setRoundIdx(rounds.length);
+    setBattleDone(true);
+    setStatusMsg(winner === "player" ? "You win!" : "You lose!");
+  }
+
+  function animateRound(idx: number) {
+    if (skipRef.current || idx >= rounds.length) {
+      finishBattle();
+      return;
+    }
+
+    const round = rounds[idx];
+    setRoundIdx(idx);
+
+    const atkName = round.attacker === "player" ? playerMonster.name : wildMonster.name;
+    setStatusMsg(round.hit
+      ? `${atkName} attacks! ${round.damage > 0 ? `(-${round.damage})` : ""}`
+      : `${atkName} missed!`
+    );
+    setAttacking(round.attacker);
+
+    addTimer(() => {
+      if (skipRef.current) { finishBattle(); return; }
+      setAttacking(null);
+      setPlayerHp(round.playerHpAfter);
+      setWildHp(round.wildHpAfter);
+
+      addTimer(() => {
+        if (skipRef.current) { finishBattle(); return; }
+        animateRound(idx + 1);
+      }, 500);
+    }, 350);
+  }
+
+  // Start animation after brief intro
+  useEffect(() => {
+    const t = setTimeout(() => animateRound(0), 800);
+    return () => { clearTimers(); clearTimeout(t); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleSkip() {
+    skipRef.current = true;
+    clearTimers();
+    finishBattle();
+  }
+
+  const progress = rounds.length > 0
+    ? Math.min(100, Math.round((Math.max(0, roundIdx) / rounds.length) * 100))
+    : 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.85)" }}
+    >
+      {/* Monsters */}
+      <div className="flex items-end justify-center gap-24">
+        <Combatant
+          displayMonster={playerMonster}
+          name={playerMonster.name}
+          level={playerMonster.rpg.level}
+          hp={playerHp}
+          maxHp={playerMonster.rpg.maxHp}
+          side="left"
+          attacking={attacking === "player"}
+        />
+        <Combatant
+          displayMonster={wildDisplay}
+          name={wildMonster.name}
+          level={wildMonster.level}
+          hp={wildHp}
+          maxHp={wildMonster.rpg.maxHp}
+          side="right"
+          attacking={attacking === "wild"}
+        />
+      </div>
+
+      {/* Status message */}
+      <div className="w-full max-w-xs border border-monster-border bg-monster-panel px-4 py-3 text-center min-h-[32px]">
+        <p style={{ fontSize: "7px" }} className="text-monster-text uppercase tracking-wide">
+          {statusMsg}
+        </p>
+      </div>
+
+      {/* Progress bar */}
+      {!battleDone && (
+        <div className="w-full max-w-xs h-1 bg-monster-border overflow-hidden">
+          <div
+            className="h-full bg-monster-text transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+
+      {/* Skip / done */}
+      {!battleDone ? (
+        <button
+          onClick={handleSkip}
+          style={{ fontSize: "7px" }}
+          className="px-6 py-3 border border-monster-border bg-monster-panel text-monster-muted uppercase tracking-widest hover:bg-monster-border active:scale-95 transition-all"
+        >
+          Skip
+        </button>
+      ) : null}
+
+      {/* Win / Lose overlay */}
+      {battleDone && (
+        <div
+          className="fixed inset-0 flex flex-col items-center justify-center gap-6"
+          style={{ backgroundColor: "rgba(0,0,0,0.70)", zIndex: 60 }}
+        >
+          <p
+            style={{ fontSize: "28px" }}
+            className={`uppercase tracking-widest font-bold ${winner === "player" ? "text-monster-text" : "text-red-400"}`}
+          >
+            {winner === "player" ? "Win!" : "Lose!"}
+          </p>
+          {winner === "player" && (
+            <div className="flex flex-col items-center gap-1">
+              {battleResult.expGained > 0 && (
+                <p style={{ fontSize: "7px" }} className="text-monster-text uppercase tracking-wide">
+                  + {battleResult.expGained} EXP
+                </p>
+              )}
+              {battleResult.coinsGained > 0 && (
+                <p style={{ fontSize: "7px" }} className="text-monster-text uppercase tracking-wide">
+                  + {battleResult.coinsGained} coins
+                </p>
+              )}
+            </div>
+          )}
+          {winner === "wild" && (
+            <p style={{ fontSize: "7px" }} className="text-monster-muted uppercase tracking-wide">
+              {playerMonster.name} is injured.
+            </p>
+          )}
+          <button
+            onClick={onComplete}
+            style={{ fontSize: "7px" }}
+            className="px-6 py-3 border border-monster-border bg-monster-panel text-monster-text uppercase tracking-widest hover:bg-monster-border active:scale-95 transition-all"
+          >
+            OK
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

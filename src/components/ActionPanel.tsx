@@ -42,14 +42,19 @@ interface Props {
 }
 
 export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, onTrain, onAdventure, message }: Props) {
-  const { care, poops, isDead, lastPetTime, name, isAdventuring, isSick } = monster;
+  const { care, poops, isDead, lastPetTime, name, isAdventuring, isSick, isInjured } = monster;
 
   const now           = Date.now();
   const canClean      = !isDead && poops.length > 0;
-  const canTrain      = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring;
+  const canTrain      = !isDead && !isSick && !isInjured && Math.round(care.energy) >= 1 && !isAdventuring;
   const petOnCooldown = lastPetTime !== null && now - lastPetTime < PET_COOLDOWN_MS;
   const canPet        = !isDead && !petOnCooldown && !isAdventuring;
   const canAdventure  = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring;
+
+  const trainTitle = isSick       ? `${name} is too sick to train`
+                   : isInjured    ? `${name} is injured — use a First Aid Kit first`
+                   : !canTrain    ? "No energy"
+                   : "Train your monster";
 
   const adventureTitle = isAdventuring
     ? `${name} is away on an adventure`
@@ -88,7 +93,7 @@ export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, on
           label="Train"
           onClick={onTrain}
           disabled={!canTrain}
-          title={isSick ? `${name} is too sick to train` : canTrain ? "Train your monster" : "No energy"}
+          title={trainTitle}
         />
         <ActionBtn
           label={isAdventuring ? "Adventuring..." : "Adventure"}

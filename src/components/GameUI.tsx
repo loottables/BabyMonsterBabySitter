@@ -10,6 +10,8 @@ import SettingsPanel from "./SettingsPanel";
 import TrainingModal from "./TrainingModal";
 import DeathScreen from "./DeathScreen";
 import AdventureResultModal from "./AdventureResultModal";
+import WildBattleEncounter from "./WildBattleEncounter";
+import BattleView from "./BattleView";
 import { useGameState } from "@/hooks/useGameState";
 import { checkName } from "@/lib/nameFilter";
 import { ADVENTURE_DURATION_MS } from "@/lib/constants";
@@ -71,9 +73,11 @@ function AdventureOverlay({ adventureStart }: { adventureStart: number }) {
 
 export default function GameUI() {
   const {
-    monster, inventory, coins, anim, message, isLoading, showTrain, adventureResult,
+    monster, inventory, coins, anim, message, isLoading, showTrain,
+    adventureResult, pendingEncounter, activeBattle,
     spawnMonster, useItem, deleteItem, buyItem, pet, clean, train, toggleTrain,
-    adventure, dismissAdventureResult, rename, wipeAll,
+    adventure, dismissAdventureResult, runFromBattle, acceptBattle, completeBattle,
+    rename, wipeAll,
   } = useGameState();
   const [showBag,      setShowBag]      = useState(false);
   const [showShop,     setShowShop]     = useState(false);
@@ -238,6 +242,7 @@ export default function GameUI() {
             <span>Day {monster.age}</span>
             <span>Lv.{monster.rpg.level}</span>
             {monster.isSick                && <span className="animate-pulse">! Sick</span>}
+            {monster.isInjured             && <span className="animate-pulse">! Injured</span>}
             {monster.care.hunger <= 20    && <span className="animate-pulse">! Hungry</span>}
             {monster.care.happiness <= 20 && <span className="animate-pulse">! Sad</span>}
             {monster.poops.length >= 3    && <span className="animate-pulse">! Dirty</span>}
@@ -309,6 +314,25 @@ export default function GameUI() {
 
       {adventureResult && (
         <AdventureResultModal result={adventureResult} onClose={dismissAdventureResult} />
+      )}
+
+      {pendingEncounter && (
+        <WildBattleEncounter
+          encounter={pendingEncounter}
+          playerName={monster.name}
+          isInjured={monster.isInjured}
+          inventory={inventory}
+          onRun={runFromBattle}
+          onAccept={acceptBattle}
+        />
+      )}
+
+      {activeBattle && (
+        <BattleView
+          encounter={activeBattle}
+          playerMonster={monster}
+          onComplete={completeBattle}
+        />
       )}
 
       {settingsBtn}

@@ -9,6 +9,7 @@ import {
   grantExp, startAdventure as doStartAdventure,
 } from "@/lib/gameEngine";
 import { resolveAdventure, type AdventureResultData } from "@/lib/adventureEngine";
+import type { WildMonster, BattleResult } from "@/lib/battleEngine";
 import {
   loadInventory, saveInventory, consumeSlot, deleteSlot,
   clearInventory, createDefaultInventory, addToInventory,
@@ -18,15 +19,23 @@ import { STARTING_COINS, ADVENTURE_DURATION_MS } from "@/lib/constants";
 
 // ── state ──────────────────────────────────────────────────────────────────
 
+export interface PendingEncounter {
+  wildMonster:  WildMonster;
+  battleResult: BattleResult;
+  location:     string;
+}
+
 interface State {
-  monster:         Monster | null;
-  inventory:       Inventory;
-  coins:           number;
-  anim:            AnimationState;
-  message:         string;
-  isLoading:       boolean;
-  showTrain:       boolean;
-  adventureResult: AdventureResultData | null;
+  monster:          Monster | null;
+  inventory:        Inventory;
+  coins:            number;
+  anim:             AnimationState;
+  message:          string;
+  isLoading:        boolean;
+  showTrain:        boolean;
+  adventureResult:  AdventureResultData | null;
+  pendingEncounter: PendingEncounter | null;
+  activeBattle:     PendingEncounter | null;
 }
 
 // ── actions ────────────────────────────────────────────────────────────────
@@ -45,6 +54,9 @@ type Action =
   | { type: "TOGGLE_TRAIN_MODAL" }
   | { type: "START_ADVENTURE" }
   | { type: "DISMISS_ADVENTURE_RESULT" }
+  | { type: "RUN_FROM_BATTLE" }
+  | { type: "ACCEPT_BATTLE";    useFirstAidKit: boolean }
+  | { type: "COMPLETE_BATTLE" }
   | { type: "RESET" }
   | { type: "WIPE_ALL" }
   | { type: "SET_ANIM";               anim: AnimationState }
@@ -54,11 +66,24 @@ type Action =
 
 function applyAdventureResult(state: State, monster: Monster): State {
   const seed    = monster.adventureStart!;
-  const outcome = resolveAdventure(monster.name, seed, monster.rpg.exp);
+  const outcome = resolveAdventure(monster.name, seed, monster.rpg.exp, monster.rpg.level, monster.rpg);
 
-  let m = grantExp(monster, outcome.expGained);
-  m = { ...m, isAdventuring: false, adventureStart: null };
+  const m = { ...monster, isAdventuring: false, adventureStart: null };
 
+  // Wild battle: defer to the encounter screen
+  if (outcome.wildBattle) {
+    return {
+      ...state,
+      monster: m,
+      pendingEncounter: {
+        wildMonster:  outcome.wildBattle.wildMonster,
+        battleResult: outcome.wildBattle.battleResult,
+        location:     outcome.wildBattle.location,
+      },
+    };
+  }
+
+  let rewarded = grantExp(m, outcome.expGained);
   let inv = state.inventory;
   let itemObtained = false;
   if (outcome.itemFound) {
@@ -67,7 +92,7 @@ function applyAdventureResult(state: State, monster: Monster): State {
   }
 
   const result: AdventureResultData = { ...outcome, itemObtained };
-  return { ...state, monster: m, inventory: inv, coins: state.coins + outcome.coinsFound, adventureResult: result, anim: "happy" };
+  return { ...state, monster: rewarded, inventory: inv, coins: state.coins + outcome.coinsFound, adventureResult: result, anim: "happy" };
 }
 
 // ── reducer ────────────────────────────────────────────────────────────────
@@ -186,6 +211,45 @@ function reducer(state: State, action: Action): State {
     case "DISMISS_ADVENTURE_RESULT":
       return { ...state, adventureResult: null };
 
+    case "RUN_FROM_BATTLE":
+      return { ...state, pendingEncounter: null, message: "You ran away safely." };
+
+    case "ACCEPT_BATTLE": {
+      if (!state.pendingEncounter) return state;
+      let m = state.monster!;
+      let inv = state.inventory;
+      if (action.useFirstAidKit) {
+        const slotIdx = inv.findIndex(s => s?.itemId === "first_aid_kit");
+        const result  = consumeSlot(inv, slotIdx);
+        if (result) { inv = result.inv; saveInventory(inv); }
+        m = { ...m, isInjured: false };
+      }
+      return {
+        ...state,
+        monster:         m,
+        inventory:       inv,
+        pendingEncounter: null,
+        activeBattle:    state.pendingEncounter,
+      };
+    }
+
+    case "COMPLETE_BATTLE": {
+      if (!state.activeBattle || !state.monster) return state;
+      const { battleResult } = state.activeBattle;
+      let m = { ...state.monster, rpg: { ...state.monster.rpg, hp: battleResult.finalPlayerHp } };
+      if (battleResult.winner === "player") {
+        m = grantExp(m, battleResult.expGained);
+      } else {
+        m = { ...m, rpg: { ...m.rpg, hp: 1 }, isInjured: true };
+      }
+      return {
+        ...state,
+        monster:      m,
+        coins:        state.coins + (battleResult.winner === "player" ? battleResult.coinsGained : 0),
+        activeBattle: null,
+      };
+    }
+
     case "RESET": {
       clearMonster();
       return { ...state, monster: null, anim: "idle", message: "", showTrain: false };
@@ -212,14 +276,16 @@ function reducer(state: State, action: Action): State {
 }
 
 const INITIAL: State = {
-  monster:         null,
-  inventory:       Array(9).fill(null),
-  coins:           STARTING_COINS,
-  anim:            "idle",
-  message:         "",
-  isLoading:       true,
-  showTrain:       false,
-  adventureResult: null,
+  monster:          null,
+  inventory:        Array(9).fill(null),
+  coins:            STARTING_COINS,
+  anim:             "idle",
+  message:          "",
+  isLoading:        true,
+  showTrain:        false,
+  adventureResult:  null,
+  pendingEncounter: null,
+  activeBattle:     null,
 };
 
 // ── hook ───────────────────────────────────────────────────────────────────
@@ -287,8 +353,11 @@ export function useGameState() {
   const clean      = useCallback(() => dispatch({ type: "CLEAN" }), []);
   const train      = useCallback((ex: TrainingType) => dispatch({ type: "TRAIN", exercise: ex }), []);
   const toggleTrain = useCallback(() => dispatch({ type: "TOGGLE_TRAIN_MODAL" }), []);
-  const adventure  = useCallback(() => dispatch({ type: "START_ADVENTURE" }), []);
+  const adventure              = useCallback(() => dispatch({ type: "START_ADVENTURE" }), []);
   const dismissAdventureResult = useCallback(() => dispatch({ type: "DISMISS_ADVENTURE_RESULT" }), []);
+  const runFromBattle          = useCallback(() => dispatch({ type: "RUN_FROM_BATTLE" }), []);
+  const acceptBattle           = useCallback((useFirstAidKit: boolean) => dispatch({ type: "ACCEPT_BATTLE", useFirstAidKit }), []);
+  const completeBattle         = useCallback(() => dispatch({ type: "COMPLETE_BATTLE" }), []);
   const reset      = useCallback(() => dispatch({ type: "RESET" }), []);
   const wipeAll    = useCallback(() => dispatch({ type: "WIPE_ALL" }), []);
 
@@ -312,7 +381,12 @@ export function useGameState() {
     toggleTrain,
     adventure,
     dismissAdventureResult,
+    runFromBattle,
+    acceptBattle,
+    completeBattle,
     reset,
     wipeAll,
+    pendingEncounter: state.pendingEncounter,
+    activeBattle:     state.activeBattle,
   };
 }

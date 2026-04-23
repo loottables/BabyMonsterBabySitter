@@ -12,6 +12,7 @@ import {
   SICK_FROM_POOP_MS,
   SICK_FROM_HUNGER_MS,
   SICK_HAPPINESS_DRAIN_PER_MIN,
+  INJURED_HAPPINESS_DRAIN_PER_MIN,
   NEGLECT_DEATH_MS,
   SADNESS_DEATH_MS,
   HUNGER_ENERGY_DRAIN_MS,
@@ -128,6 +129,7 @@ export function createMonster(): Monster {
     hatchTime:        t + EGG_HATCH_MS,
     isAdventuring:    false,
     adventureStart:   null,
+    isInjured:        false,
   };
 }
 
@@ -280,6 +282,11 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
     m.care.happiness = clamp(m.care.happiness - SICK_HAPPINESS_DRAIN_PER_MIN * minutes);
   }
 
+  // Injury also drains happiness
+  if (m.isInjured && !m.isDead) {
+    m.care.happiness = clamp(m.care.happiness - INJURED_HAPPINESS_DRAIN_PER_MIN * minutes);
+  }
+
   // Reset dirtyStart if poops cleared (and not sick from it already)
   if (m.poops.length < 3 && !m.isSick) m.dirtyStart = null;
 
@@ -354,6 +361,13 @@ export function applyItem(monster: Monster, itemId: ItemId): ActionResult {
       return { ok: true, monster: m, message: `${m.name} is cured!` };
     }
 
+    case "first_aid_kit": {
+      if (!monster.isInjured)
+        return { ok: false, message: `${monster.name} isn't injured!` };
+      const m = { ...monster, isInjured: false };
+      return { ok: true, monster: m, message: `${m.name}'s injuries are treated!` };
+    }
+
     case "name_change":
       return { ok: false, message: "Click your monster's name to rename!" };
   }
@@ -401,6 +415,8 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
 
   if (monster.isSick)
     return { ok: false, message: `${monster.name} is too sick to train!` };
+  if (monster.isInjured)
+    return { ok: false, message: `${monster.name} is injured and needs a First Aid Kit before training!` };
   if (Math.round(monster.care.energy) < 1)
     return { ok: false, message: `Not enough energy!` };
 
@@ -482,6 +498,7 @@ export function loadMonster(): Monster | null {
     if (m.hasBeenRenamed  === undefined) m.hasBeenRenamed   = false;
     if (m.isAdventuring   === undefined) m.isAdventuring    = false;
     if (m.adventureStart  === undefined) m.adventureStart   = null;
+    if (m.isInjured       === undefined) m.isInjured        = false;
     // Apply offline decay before returning
     return applyDecay(m, Date.now());
   } catch {

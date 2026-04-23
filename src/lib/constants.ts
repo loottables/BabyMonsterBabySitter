@@ -26,7 +26,8 @@ export const POOP_HAPPINESS_DRAIN_PER_MIN = 0.5;
 // Death timers — total time from full hunger to death = 2h + 22h = 24h
 export const SICK_FROM_POOP_MS   = 15 * 60 * 1000;    // 15 min with 3+ poops → sick
 export const SICK_FROM_HUNGER_MS = 30 * 60 * 1000;    // 30 min at 0 hunger → sick
-export const SICK_HAPPINESS_DRAIN_PER_MIN = 2.0;       // extra happiness drain while sick
+export const SICK_HAPPINESS_DRAIN_PER_MIN    = 2.0;    // extra happiness drain while sick
+export const INJURED_HAPPINESS_DRAIN_PER_MIN = 1.5;    // extra happiness drain while injured
 export const NEGLECT_DEATH_MS = 22 * 60 * 60 * 1000;  // 22h at 0 hunger → death
 export const SADNESS_DEATH_MS = 12 * 60 * 60 * 1000;  // 12h at 0 happiness → death
 export const HUNGER_ENERGY_DRAIN_MS = 5 * 60 * 1000; // drain 1 energy per 5 min while starving

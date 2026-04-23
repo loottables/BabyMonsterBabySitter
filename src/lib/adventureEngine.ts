@@ -1,4 +1,6 @@
 import type { ItemId } from "@/types/items";
+import type { RPGStats } from "@/types/game";
+import { generateWildMonster, simulateBattle, type WildMonster, type BattleResult } from "./battleEngine";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -8,6 +10,11 @@ export interface AdventureResultData {
   itemObtained: boolean;   // false if bag was full
   expGained:    number;
   coinsFound:   number;
+  wildBattle: {
+    wildMonster:   WildMonster;
+    battleResult:  BattleResult;
+    location:      string;        // flavour text for the encounter screen
+  } | null;
 }
 
 // ── Scenario library ───────────────────────────────────────────────────────
@@ -335,24 +342,49 @@ function pick<T>(rng: () => number, arr: T[]): T {
 
 // ── Resolution ─────────────────────────────────────────────────────────────
 
-type EventType = "both" | "exp" | "treasure" | "coins_exp" | "quiet";
+type EventType = "both" | "exp" | "treasure" | "coins_exp" | "wild_battle" | "quiet";
 
 const EVENT_WEIGHTS: { id: EventType; weight: number }[] = [
-  { id: "both",      weight: 28 },
-  { id: "exp",       weight: 35 },
-  { id: "treasure",  weight: 10 },
-  { id: "coins_exp", weight: 16 },
-  { id: "quiet",     weight: 11 },
+  { id: "both",        weight: 22 },
+  { id: "exp",         weight: 27 },
+  { id: "treasure",    weight: 9  },
+  { id: "coins_exp",   weight: 12 },
+  { id: "wild_battle", weight: 19 },
+  { id: "quiet",       weight: 11 },
 ];
 
-export function resolveAdventure(monsterName: string, seed: number, monsterExp: number): AdventureResultData {
+export function resolveAdventure(
+  monsterName:  string,
+  seed:         number,
+  monsterExp:   number,
+  playerLevel:  number,
+  playerRpg:    RPGStats,
+): AdventureResultData {
   const rng      = seededRandom(seed);
   const scenario = pick(rng, SCENARIOS);
   const event    = pickWeighted(rng, EVENT_WEIGHTS);
 
+  // ── Wild battle: pre-calculate the full battle and defer UI to encounter screen
+  if (event === "wild_battle") {
+    const wildMonster  = generateWildMonster(playerLevel, rng);
+    const battleResult = simulateBattle(
+      playerRpg, wildMonster.rpg,
+      playerLevel, wildMonster.level,
+      monsterExp, rng,
+    );
+    return {
+      narrative:   "",
+      itemFound:   null,
+      itemObtained: false,
+      expGained:   0,
+      coinsFound:  0,
+      wildBattle:  { wildMonster, battleResult, location: scenario.location },
+    };
+  }
+
   const itemFound = event === "both" ? pickWeighted(rng, ADVENTURE_ITEM_POOL) : null;
 
-  // Item + exp:  10 flat + 1–5% of current exp (smaller bonus alongside loot)
+  // Item + exp:  10 flat + 1–5% of current exp
   // Exp only:    8–18% of current exp
   // Treasure:    1–100 coins, no exp
   // Coins + exp: 1–35 coins + 1–5% of current exp
@@ -386,5 +418,5 @@ export function resolveAdventure(monsterName: string, seed: number, monsterExp: 
     `${eventLine.replace(/{name}/g, monsterName)} ` +
     `${closing.replace(/{name}/g, monsterName)}`;
 
-  return { narrative, itemFound, itemObtained: true, expGained, coinsFound };
+  return { narrative, itemFound, itemObtained: true, expGained, coinsFound, wildBattle: null };
 }
