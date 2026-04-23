@@ -1,2 +1,1 @@
-# Normalize line endings to LF on commit, convert to CRLF on Windows checkout
-* text=auto eol=lf
+* text=auto
