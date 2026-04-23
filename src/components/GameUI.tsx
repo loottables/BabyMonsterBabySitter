@@ -9,8 +9,10 @@ import ShopPanel from "./ShopPanel";
 import SettingsPanel from "./SettingsPanel";
 import TrainingModal from "./TrainingModal";
 import DeathScreen from "./DeathScreen";
+import AdventureResultModal from "./AdventureResultModal";
 import { useGameState } from "@/hooks/useGameState";
 import { checkName } from "@/lib/nameFilter";
+import { ADVENTURE_DURATION_MS } from "@/lib/constants";
 
 const MonsterCanvas = dynamic(() => import("./MonsterCanvas"), { ssr: false });
 
@@ -39,10 +41,39 @@ function EggCountdown({ hatchTime }: { hatchTime: number }) {
   );
 }
 
+function AdventureOverlay({ adventureStart }: { adventureStart: number }) {
+  const end = adventureStart + ADVENTURE_DURATION_MS;
+  const [msLeft, setMsLeft] = useState(() => Math.max(0, end - Date.now()));
+
+  useEffect(() => {
+    const id = setInterval(() => setMsLeft(Math.max(0, end - Date.now())), 500);
+    return () => clearInterval(id);
+  }, [end]);
+
+  const totalSec = Math.ceil(msLeft / 1000);
+  const mins     = Math.floor(totalSec / 60);
+  const secs     = totalSec % 60;
+
+  return (
+    <div
+      className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+      style={{ backgroundColor: "rgba(0,0,0,0.65)" }}
+    >
+      <span style={{ fontSize: "8px" }} className="text-monster-text uppercase tracking-widest animate-pulse">
+        Adventuring...
+      </span>
+      <span style={{ fontSize: "11px" }} className="text-monster-text tabular-nums">
+        {mins}:{secs.toString().padStart(2, "0")}
+      </span>
+    </div>
+  );
+}
+
 export default function GameUI() {
   const {
-    monster, inventory, coins, anim, message, isLoading, showTrain,
-    spawnMonster, useItem, deleteItem, buyItem, pet, clean, train, toggleTrain, rename, wipeAll,
+    monster, inventory, coins, anim, message, isLoading, showTrain, adventureResult,
+    spawnMonster, useItem, deleteItem, buyItem, pet, clean, train, toggleTrain,
+    adventure, dismissAdventureResult, rename, wipeAll,
   } = useGameState();
   const [showBag,      setShowBag]      = useState(false);
   const [showShop,     setShowShop]     = useState(false);
@@ -221,7 +252,12 @@ export default function GameUI() {
         </div>
 
         <div className="flex flex-col items-center gap-3 shrink-0">
-          <MonsterCanvas monster={monster} anim={anim} />
+          <div className="relative">
+            <MonsterCanvas monster={monster} anim={anim} />
+            {monster.isAdventuring && monster.adventureStart !== null && (
+              <AdventureOverlay adventureStart={monster.adventureStart} />
+            )}
+          </div>
           {monster.poops.length > 0 && (
             <p style={{ fontSize: "7px" }} className="text-monster-muted uppercase tracking-wide">
               {"[*]".repeat(monster.poops.length)} Needs cleaning
@@ -239,6 +275,7 @@ export default function GameUI() {
         onPet={pet}
         onClean={clean}
         onTrain={toggleTrain}
+        onAdventure={adventure}
         message={message}
       />
 
@@ -268,6 +305,10 @@ export default function GameUI() {
           onDelete={deleteItem}
           onClose={() => setShowBag(false)}
         />
+      )}
+
+      {adventureResult && (
+        <AdventureResultModal result={adventureResult} onClose={dismissAdventureResult} />
       )}
 
       {settingsBtn}

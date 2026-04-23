@@ -126,7 +126,30 @@ export function createMonster(): Monster {
     lastPetTime:            null,
     isHatched:        EGG_HATCH_MS === 0,
     hatchTime:        t + EGG_HATCH_MS,
+    isAdventuring:    false,
+    adventureStart:   null,
   };
+}
+
+export function grantExp(monster: Monster, exp: number): Monster {
+  let rpg = { ...monster.rpg, exp: monster.rpg.exp + exp };
+  rpg = levelUp(rpg);
+  return { ...monster, rpg };
+}
+
+export function startAdventure(monster: Monster): ActionResult {
+  if (!monster.isHatched) return { ok: false, message: "The egg hasn't hatched yet!" };
+  if (monster.isDead)     return { ok: false, message: "Monster is dead." };
+  if (monster.isAdventuring) return { ok: false, message: `${monster.name} is already adventuring!` };
+  if (monster.isSick)     return { ok: false, message: `${monster.name} is too sick to adventure!` };
+  if (Math.round(monster.care.energy) < 1) return { ok: false, message: "Not enough energy!" };
+  const m: Monster = {
+    ...monster,
+    isAdventuring:  true,
+    adventureStart: now(),
+    care: { ...monster.care, energy: clamp(monster.care.energy - 1) },
+  };
+  return { ok: true, monster: m, message: `${m.name} sets out on an adventure!` };
 }
 
 // ── offline + tick decay ───────────────────────────────────────────────────
@@ -442,6 +465,8 @@ export function loadMonster(): Monster | null {
     if (m.dirtyStart  === undefined) m.dirtyStart  = null;
     if (m.lastPetTime      === undefined) m.lastPetTime      = null;
     if (m.hasBeenRenamed  === undefined) m.hasBeenRenamed   = false;
+    if (m.isAdventuring   === undefined) m.isAdventuring    = false;
+    if (m.adventureStart  === undefined) m.adventureStart   = null;
     // Apply offline decay before returning
     return applyDecay(m, Date.now());
   } catch {

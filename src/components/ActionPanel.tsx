@@ -31,23 +31,33 @@ function ActionBtn({ label, onClick, disabled, title }: BtnProps) {
 }
 
 interface Props {
-  monster:  Monster;
-  onBag:    () => void;
-  onShop:   () => void;
-  onPet:    () => void;
-  onClean:  () => void;
-  onTrain:  () => void;
-  message:  string;
+  monster:     Monster;
+  onBag:       () => void;
+  onShop:      () => void;
+  onPet:       () => void;
+  onClean:     () => void;
+  onTrain:     () => void;
+  onAdventure: () => void;
+  message:     string;
 }
 
-export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, onTrain, message }: Props) {
-  const { care, poops, isDead, lastPetTime, name } = monster;
+export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, onTrain, onAdventure, message }: Props) {
+  const { care, poops, isDead, lastPetTime, name, isAdventuring, isSick } = monster;
 
-  const now        = Date.now();
-  const canClean   = !isDead && poops.length > 0;
-  const canTrain   = !isDead && !monster.isSick && Math.round(care.energy) >= 1;
+  const now           = Date.now();
+  const canClean      = !isDead && poops.length > 0;
+  const canTrain      = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring;
   const petOnCooldown = lastPetTime !== null && now - lastPetTime < PET_COOLDOWN_MS;
-  const canPet     = !isDead && !petOnCooldown;
+  const canPet        = !isDead && !petOnCooldown && !isAdventuring;
+  const canAdventure  = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring;
+
+  const adventureTitle = isAdventuring
+    ? `${name} is away on an adventure`
+    : isSick
+    ? `${name} is too sick to adventure`
+    : Math.round(care.energy) < 1
+    ? "No energy"
+    : "Send on an adventure (costs 1 energy)";
 
   return (
     <div className="flex flex-col gap-4">
@@ -78,7 +88,13 @@ export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, on
           label="Train"
           onClick={onTrain}
           disabled={!canTrain}
-          title={monster.isSick ? `${name} is too sick to train` : canTrain ? "Train your monster" : "No energy"}
+          title={isSick ? `${name} is too sick to train` : canTrain ? "Train your monster" : "No energy"}
+        />
+        <ActionBtn
+          label={isAdventuring ? "Adventuring..." : "Adventure"}
+          onClick={onAdventure}
+          disabled={!canAdventure}
+          title={adventureTitle}
         />
       </div>
 

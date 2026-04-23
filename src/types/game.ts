@@ -51,6 +51,8 @@ export interface Monster {
   sickStart: number | null;
   dirtyStart: number | null;
   lastPetTime: number | null;
+  isAdventuring: boolean;
+  adventureStart: number | null;
   // Egg hatching
   isHatched: boolean;
   hatchTime: number;      // unix ms when the egg hatches

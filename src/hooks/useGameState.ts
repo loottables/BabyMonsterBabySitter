@@ -6,58 +6,99 @@ import type { Inventory, ItemId } from "@/types/items";
 import {
   createMonster, loadMonster, saveMonster, clearMonster,
   cleanPoop, trainMonster, petMonster, applyDecay, applyItem,
+  grantExp, startAdventure as doStartAdventure,
 } from "@/lib/gameEngine";
+import { resolveAdventure, type AdventureResultData } from "@/lib/adventureEngine";
 import {
   loadInventory, saveInventory, consumeSlot, deleteSlot,
   clearInventory, createDefaultInventory, addToInventory,
 } from "@/lib/inventory";
 import { loadCoins, saveCoins, clearCoins } from "@/lib/coins";
-import { STARTING_COINS } from "@/lib/constants";
+import { STARTING_COINS, ADVENTURE_DURATION_MS } from "@/lib/constants";
 
 // ── state ──────────────────────────────────────────────────────────────────
 
 interface State {
-  monster:   Monster | null;
-  inventory: Inventory;
-  coins:     number;
-  anim:      AnimationState;
-  message:   string;
-  isLoading: boolean;
-  showTrain: boolean;
+  monster:         Monster | null;
+  inventory:       Inventory;
+  coins:           number;
+  anim:            AnimationState;
+  message:         string;
+  isLoading:       boolean;
+  showTrain:       boolean;
+  adventureResult: AdventureResultData | null;
 }
 
 // ── actions ────────────────────────────────────────────────────────────────
 
 type Action =
-  | { type: "LOAD";         monster: Monster | null; inventory: Inventory; coins: number }
-  | { type: "NEW_MONSTER";  monster: Monster }
+  | { type: "LOAD";                   monster: Monster | null; inventory: Inventory; coins: number }
+  | { type: "NEW_MONSTER";            monster: Monster }
   | { type: "TICK" }
-  | { type: "USE_ITEM";     slotIndex: number }
-  | { type: "DELETE_ITEM";  slotIndex: number }
-  | { type: "BUY_ITEM";    itemId: ItemId; price: number }
-  | { type: "RENAME";      name: string }
+  | { type: "USE_ITEM";               slotIndex: number }
+  | { type: "DELETE_ITEM";            slotIndex: number }
+  | { type: "BUY_ITEM";               itemId: ItemId; price: number }
+  | { type: "RENAME";                 name: string }
   | { type: "PET" }
   | { type: "CLEAN" }
-  | { type: "TRAIN";        exercise: TrainingType }
+  | { type: "TRAIN";                  exercise: TrainingType }
   | { type: "TOGGLE_TRAIN_MODAL" }
+  | { type: "START_ADVENTURE" }
+  | { type: "DISMISS_ADVENTURE_RESULT" }
   | { type: "RESET" }
   | { type: "WIPE_ALL" }
-  | { type: "SET_ANIM";     anim: AnimationState }
-  | { type: "SET_MSG";      message: string };
+  | { type: "SET_ANIM";               anim: AnimationState }
+  | { type: "SET_MSG";                message: string };
+
+// ── adventure resolution ───────────────────────────────────────────────────
+
+function applyAdventureResult(state: State, monster: Monster): State {
+  const seed    = monster.adventureStart!;
+  const outcome = resolveAdventure(monster.name, seed, monster.rpg.exp);
+
+  let m = grantExp(monster, outcome.expGained);
+  m = { ...m, isAdventuring: false, adventureStart: null };
+
+  let inv = state.inventory;
+  let itemObtained = false;
+  if (outcome.itemFound) {
+    const newInv = addToInventory(inv, outcome.itemFound);
+    if (newInv) { inv = newInv; itemObtained = true; saveInventory(inv); }
+  }
+
+  const result: AdventureResultData = { ...outcome, itemObtained };
+  return { ...state, monster: m, inventory: inv, adventureResult: result, anim: "happy" };
+}
 
 // ── reducer ────────────────────────────────────────────────────────────────
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case "LOAD":
-      return { ...state, monster: action.monster, inventory: action.inventory, coins: action.coins, isLoading: false };
+    case "LOAD": {
+      let s: State = { ...state, monster: action.monster, inventory: action.inventory, coins: action.coins, isLoading: false };
+      const m = action.monster;
+      if (m && m.isAdventuring && m.adventureStart !== null) {
+        if (Date.now() - m.adventureStart >= ADVENTURE_DURATION_MS) {
+          s = applyAdventureResult({ ...s, monster: m }, m);
+        }
+      }
+      return s;
+    }
 
     case "NEW_MONSTER":
       return { ...state, monster: action.monster, anim: "idle", message: "" };
 
     case "TICK": {
       if (!state.monster || state.monster.isDead) return state;
-      const m = applyDecay(state.monster, Date.now());
+      let m = applyDecay(state.monster, Date.now());
+
+      // Adventure completion check
+      if (m.isAdventuring && m.adventureStart !== null) {
+        if (Date.now() - m.adventureStart >= ADVENTURE_DURATION_MS) {
+          return applyAdventureResult(state, m);
+        }
+      }
+
       return { ...state, monster: m, anim: m.isDead ? "dead" : state.anim };
     }
 
@@ -135,6 +176,16 @@ function reducer(state: State, action: Action): State {
     case "TOGGLE_TRAIN_MODAL":
       return { ...state, showTrain: !state.showTrain };
 
+    case "START_ADVENTURE": {
+      if (!state.monster) return state;
+      const result = doStartAdventure(state.monster);
+      if (!result.ok) return { ...state, message: result.message };
+      return { ...state, monster: result.monster, message: result.message };
+    }
+
+    case "DISMISS_ADVENTURE_RESULT":
+      return { ...state, adventureResult: null };
+
     case "RESET": {
       clearMonster();
       return { ...state, monster: null, anim: "idle", message: "", showTrain: false };
@@ -161,13 +212,14 @@ function reducer(state: State, action: Action): State {
 }
 
 const INITIAL: State = {
-  monster:   null,
-  inventory: Array(9).fill(null),
-  coins:     STARTING_COINS,
-  anim:      "idle",
-  message:   "",
-  isLoading: true,
-  showTrain: false,
+  monster:         null,
+  inventory:       Array(9).fill(null),
+  coins:           STARTING_COINS,
+  anim:            "idle",
+  message:         "",
+  isLoading:       true,
+  showTrain:       false,
+  adventureResult: null,
 };
 
 // ── hook ───────────────────────────────────────────────────────────────────
@@ -235,17 +287,20 @@ export function useGameState() {
   const clean      = useCallback(() => dispatch({ type: "CLEAN" }), []);
   const train      = useCallback((ex: TrainingType) => dispatch({ type: "TRAIN", exercise: ex }), []);
   const toggleTrain = useCallback(() => dispatch({ type: "TOGGLE_TRAIN_MODAL" }), []);
+  const adventure  = useCallback(() => dispatch({ type: "START_ADVENTURE" }), []);
+  const dismissAdventureResult = useCallback(() => dispatch({ type: "DISMISS_ADVENTURE_RESULT" }), []);
   const reset      = useCallback(() => dispatch({ type: "RESET" }), []);
   const wipeAll    = useCallback(() => dispatch({ type: "WIPE_ALL" }), []);
 
   return {
-    monster:    state.monster,
-    inventory:  state.inventory,
-    coins:      state.coins,
-    anim:       state.anim,
-    message:    state.message,
-    isLoading:  state.isLoading,
-    showTrain:  state.showTrain,
+    monster:         state.monster,
+    inventory:       state.inventory,
+    coins:           state.coins,
+    anim:            state.anim,
+    message:         state.message,
+    isLoading:       state.isLoading,
+    showTrain:       state.showTrain,
+    adventureResult: state.adventureResult,
     spawnMonster,
     useItem,
     deleteItem,
@@ -255,6 +310,8 @@ export function useGameState() {
     clean,
     train,
     toggleTrain,
+    adventure,
+    dismissAdventureResult,
     reset,
     wipeAll,
   };
