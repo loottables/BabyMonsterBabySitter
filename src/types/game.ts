@@ -54,6 +54,7 @@ export interface Monster {
   isAdventuring: boolean;
   adventureStart: number | null;
   isInjured: boolean;
+  injuredHealStart: number | null;  // when full HP while injured — clears injury after 30 min
   // Egg hatching
   isHatched: boolean;
   hatchTime: number;      // unix ms when the egg hatches

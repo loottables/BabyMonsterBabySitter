@@ -131,6 +131,7 @@ export function createMonster(): Monster {
     isAdventuring:    false,
     adventureStart:   null,
     isInjured:        false,
+    injuredHealStart: null,
   };
 }
 
@@ -288,11 +289,25 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
     m.care.happiness = clamp(m.care.happiness - INJURED_HAPPINESS_DRAIN_PER_MIN * minutes);
   }
 
-  // HP regeneration — paused while sick or injured; doubled when happy + clean ≥ 90
-  if (!m.isDead && !m.isSick && !m.isInjured && m.rpg.hp < m.rpg.maxHp) {
+  // HP regeneration — paused while sick; doubled when happy + clean + hunger ≥ 50
+  if (!m.isDead && !m.isSick && m.rpg.hp < m.rpg.maxHp) {
     const wellCared   = m.care.happiness >= 50 && m.care.cleanliness >= 50 && m.care.hunger >= 50;
     const regenPerMin = m.rpg.maxHp * HP_REGEN_PCT_PER_MIN * (wellCared ? 2 : 1);
     m.rpg.hp = Math.min(m.rpg.maxHp, m.rpg.hp + regenPerMin * minutes);
+  }
+
+  // Injury auto-heal: 30 min at full HP clears the injured status
+  if (!m.isDead && m.isInjured) {
+    if (m.rpg.hp >= m.rpg.maxHp) {
+      if (m.injuredHealStart === null) {
+        m.injuredHealStart = toTime;
+      } else if (toTime - m.injuredHealStart >= 30 * 60 * 1000) {
+        m.isInjured        = false;
+        m.injuredHealStart = null;
+      }
+    } else {
+      m.injuredHealStart = null;
+    }
   }
 
   // Reset dirtyStart if poops cleared (and not sick from it already)
@@ -367,6 +382,14 @@ export function applyItem(monster: Monster, itemId: ItemId): ActionResult {
         return { ok: false, message: `${monster.name} isn't sick!` };
       const m = { ...monster, isSick: false, sickStart: null };
       return { ok: true, monster: m, message: `${m.name} is cured!` };
+    }
+
+    case "bandaid": {
+      if (monster.rpg.hp >= monster.rpg.maxHp)
+        return { ok: false, message: `${monster.name} is already at full HP!` };
+      const newHp = Math.min(monster.rpg.maxHp, monster.rpg.hp + 20);
+      const m = { ...monster, rpg: { ...monster.rpg, hp: newHp } };
+      return { ok: true, monster: m, message: `${m.name} recovered 20 HP!` };
     }
 
     case "first_aid_kit": {
@@ -505,7 +528,8 @@ export function loadMonster(): Monster | null {
     if (m.hasBeenRenamed  === undefined) m.hasBeenRenamed   = false;
     if (m.isAdventuring   === undefined) m.isAdventuring    = false;
     if (m.adventureStart  === undefined) m.adventureStart   = null;
-    if (m.isInjured       === undefined) m.isInjured        = false;
+    if (m.isInjured         === undefined) m.isInjured         = false;
+    if (m.injuredHealStart  === undefined) m.injuredHealStart  = null;
     // Apply offline decay before returning
     return applyDecay(m, Date.now());
   } catch {

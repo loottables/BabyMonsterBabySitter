@@ -1,4 +1,4 @@
-export type ItemId = "kibble" | "treat" | "energy_drink" | "medicine" | "vaccine" | "name_change" | "first_aid_kit";
+export type ItemId = "kibble" | "treat" | "energy_drink" | "medicine" | "vaccine" | "name_change" | "first_aid_kit" | "bandaid";
 
 export interface InventorySlot {
   itemId: ItemId;
@@ -66,6 +66,14 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     actionLabel: "",   // used via name click, not the bag use flow
     price:       500,
   },
+  bandaid: {
+    id:          "bandaid",
+    name:        "Bandaid",
+    description: "A simple bandage that patches up minor wounds.",
+    stats:       ["Restores 20 HP"],
+    actionLabel: "Use on",
+    price:       5,
+  },
   first_aid_kit: {
     id:          "first_aid_kit",
     name:        "First Aid Kit",
@@ -77,6 +85,6 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
 };
 
 // Base shop items always available
-export const SHOP_ITEMS: ItemId[] = ["kibble", "treat", "energy_drink", "medicine", "vaccine", "first_aid_kit"];
+export const SHOP_ITEMS: ItemId[] = ["kibble", "treat", "energy_drink", "bandaid", "medicine", "vaccine", "first_aid_kit"];
 // Unlocked in the shop after the first free rename is used
 export const SHOP_ITEMS_EXTENDED: ItemId[] = [...SHOP_ITEMS, "name_change"];

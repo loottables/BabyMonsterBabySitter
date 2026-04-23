@@ -121,9 +121,21 @@ export default function StatsPanel({ monster }: Props) {
             <p style={{ fontSize: "6px" }} className="text-monster-muted text-right">
               {canRegenHp
                 ? `Full in ${Math.floor(secsToFull / 60)}:${String(secsToFull % 60).padStart(2, "0")}`
-                : monster.isSick ? "Paused — sick" : "Paused — injured"}
+                : "Paused — sick"}
             </p>
           )}
+          {monster.isInjured && hpDisplay >= rpg.maxHp && (() => {
+            const healMs   = 30 * 60 * 1000;
+            const elapsed  = monster.injuredHealStart !== null ? Date.now() - monster.injuredHealStart : 0;
+            const secsLeft = Math.max(0, Math.ceil((healMs - elapsed) / 1000));
+            const m        = Math.floor(secsLeft / 60);
+            const s        = secsLeft % 60;
+            return (
+              <p style={{ fontSize: "6px" }} className="text-monster-muted text-right animate-pulse">
+                Injury heals in {m}:{String(s).padStart(2, "0")}
+              </p>
+            );
+          })()}
         </div>
 
         <RPGRow label="ATK" value={rpg.atk} />
