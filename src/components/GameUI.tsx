@@ -238,14 +238,8 @@ export default function GameUI() {
               {monster.name}
             </h2>
           )}
-          <p style={{ fontSize: "6px" }} className="text-monster-muted flex gap-3">
-            <span>Day {monster.age}</span>
-            <span>Lv.{monster.rpg.level}</span>
-            {monster.isSick                && <span className="animate-pulse">! Sick</span>}
-            {monster.isInjured             && <span className="animate-pulse">! Injured</span>}
-            {monster.care.hunger <= 20    && <span className="animate-pulse">! Hungry</span>}
-            {monster.care.happiness <= 20 && <span className="animate-pulse">! Sad</span>}
-            {monster.poops.length >= 3    && <span className="animate-pulse">! Dirty</span>}
+          <p style={{ fontSize: "6px" }} className="text-monster-muted">
+            Day {monster.age}
           </p>
         </div>
       </div>
@@ -259,6 +253,23 @@ export default function GameUI() {
         <div className="flex flex-col items-center gap-3 shrink-0">
           <div className="relative">
             <MonsterCanvas monster={monster} anim={anim} />
+
+            {/* Level + status overlay — top of the canvas window */}
+            <div className="absolute top-0 left-0 right-0 flex flex-col items-center gap-1 pt-2 pointer-events-none">
+              <span style={{ fontSize: "6px" }} className="text-monster-muted uppercase tracking-widest">
+                Lv.{monster.rpg.level}
+              </span>
+              {(monster.isSick || monster.isInjured || monster.care.hunger <= 20 || monster.care.happiness <= 20 || monster.poops.length >= 3) && (
+                <div style={{ fontSize: "6px" }} className="flex gap-2 text-monster-muted uppercase tracking-widest">
+                  {monster.isSick                && <span className="animate-pulse">! Sick</span>}
+                  {monster.isInjured             && <span className="animate-pulse">! Injured</span>}
+                  {monster.care.hunger <= 20     && <span className="animate-pulse">! Hungry</span>}
+                  {monster.care.happiness <= 20  && <span className="animate-pulse">! Sad</span>}
+                  {monster.poops.length >= 3     && <span className="animate-pulse">! Dirty</span>}
+                </div>
+              )}
+            </div>
+
             {monster.isAdventuring && monster.adventureStart !== null && (
               <AdventureOverlay adventureStart={monster.adventureStart} />
             )}
