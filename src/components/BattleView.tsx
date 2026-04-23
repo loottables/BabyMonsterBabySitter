@@ -68,7 +68,7 @@ function Combatant({ displayMonster, name, level, hp, maxHp, side, attacking }: 
         >
           {/* Scale the 320px canvas down to VISUAL size, origin top-left */}
           <div style={{ transform: `scale(${SCALE})`, transformOrigin: "top left", width: 320, height: 320 }}>
-            <MonsterCanvas monster={displayMonster} anim="idle" />
+            <MonsterCanvas monster={displayMonster} anim="idle" bare />
           </div>
         </div>
       </div>

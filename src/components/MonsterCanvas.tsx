@@ -106,9 +106,10 @@ function crackCountFromProgress(p: number): number {
 interface Props {
   monster: Monster;
   anim:    AnimationState;
+  bare?:   boolean;
 }
 
-export default function MonsterCanvas({ monster, anim }: Props) {
+export default function MonsterCanvas({ monster, anim, bare }: Props) {
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const rafRef     = useRef<number>(0);
   const startRef   = useRef<number>(0);
@@ -235,7 +236,7 @@ export default function MonsterCanvas({ monster, anim }: Props) {
       ref={canvasRef}
       width={SIZE}
       height={SIZE}
-      className="rounded-xl border-2 border-monster-border bg-monster-bg"
+      className={bare ? "" : "rounded-xl border-2 border-monster-border bg-monster-bg"}
       style={{ imageRendering: "pixelated" }}
     />
   );
