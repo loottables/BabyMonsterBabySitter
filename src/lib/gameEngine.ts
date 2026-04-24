@@ -60,6 +60,19 @@ function randomPoopPos(): Poop {
   };
 }
 
+const LEVEL_STATS = ["str", "atk", "def", "agi", "spd", "end"] as const;
+
+// Randomly spreads `points` across all 6 stats. STR gains also increase maxHp.
+function distributeStatPoints(rpg: RPGStats, points: number, rand = Math.random): RPGStats {
+  const r = { ...rpg };
+  for (let i = 0; i < points; i++) {
+    const stat = LEVEL_STATS[Math.floor(rand() * LEVEL_STATS.length)];
+    r[stat] += 1;
+    if (stat === "str") r.maxHp += STR_HP_MULTIPLIER;
+  }
+  return r;
+}
+
 // Called by grantExp and trainMonster whenever exp is added.
 // Loops until all accumulated exp is consumed, so multiple level-ups can happen at once.
 function levelUp(rpg: RPGStats): RPGStats {
@@ -68,14 +81,8 @@ function levelUp(rpg: RPGStats): RPGStats {
     r.exp      -= r.expToNext;
     r.level    += 1;
     r.expToNext = Math.round(r.expToNext * EXP_SCALE);
-    // Bonus stats on level up
-    r.str   += 1;
-    r.maxHp += 5 + STR_HP_MULTIPLIER; // 5 base + 3 from str gain
-    r.hp     = r.maxHp; // heal on level up
-    r.atk   += 1;
-    r.def   += 1;
-    r.agi   += 1;
-    r.spd   += 1;
+    r = distributeStatPoints(r, 6);
+    r.hp = r.maxHp; // heal to full on level up
   }
   return r;
 }

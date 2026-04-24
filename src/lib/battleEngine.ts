@@ -1,4 +1,5 @@
 import type { RPGStats, Monster } from "@/types/game";
+import { STR_HP_MULTIPLIER } from "@/lib/constants";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -45,21 +46,30 @@ const WILD_NAMES = [
 
 // ── Generation ─────────────────────────────────────────────────────────────
 
+const WILD_STAT_KEYS = ["str", "atk", "def", "agi", "spd", "end"] as const;
+
 // Creates a random wild monster scaled near the player's level.
 // Called from adventureEngine.ts when a "wild_battle" event is rolled during an adventure.
+// Stat budget: 30 base points (same as a player starter) + 5 per level above 1.
+// Players gain 6 per level-up vs wild's 5 — a small permanent nerf at higher levels.
 export function generateWildMonster(playerLevel: number, rng: () => number): WildMonster {
-  // Level range: anywhere from 1 up to playerLevel+1 (one level above at most)
-  const level   = Math.max(1, Math.floor(rng() * (playerLevel + 1)) + 1);
-  const seed    = Math.floor(rng() * 2 ** 31);
-  const name    = WILD_NAMES[Math.floor(rng() * WILD_NAMES.length)];
+  const level = Math.max(1, Math.floor(rng() * (playerLevel + 1)) + 1);
+  const seed  = Math.floor(rng() * 2 ** 31);
+  const name  = WILD_NAMES[Math.floor(rng() * WILD_NAMES.length)];
 
-  // Stats scale at the same rate as player stats (~N+4 average), matching player growth per level
-  const stat    = () => 3 + level + Math.floor(rng() * 4);
-  const maxHp   = 15 + level * 6 + Math.floor(rng() * 10);
+  // Start each stat at 1 (6 base), then randomly distribute the remaining budget
+  const stats = { str: 1, atk: 1, def: 1, agi: 1, spd: 1, end: 1 };
+  const bonusPool = 24 + (level - 1) * 5; // 30 total base − 6 starting + 5 per level above 1
+  for (let i = 0; i < bonusPool; i++) {
+    stats[WILD_STAT_KEYS[Math.floor(rng() * WILD_STAT_KEYS.length)]] += 1;
+  }
+
+  const baseHp = 18 + Math.floor(rng() * 8);
+  const maxHp  = baseHp + stats.str * STR_HP_MULTIPLIER;
 
   return {
     name, level, seed,
-    rpg: { hp: maxHp, maxHp, atk: stat(), def: stat(), agi: stat(), spd: stat() },
+    rpg: { hp: maxHp, maxHp, atk: stats.atk, def: stats.def, agi: stats.agi, spd: stats.spd },
   };
 }
 
