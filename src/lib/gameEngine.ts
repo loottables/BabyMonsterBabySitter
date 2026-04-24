@@ -7,6 +7,7 @@ import {
   MAX_POOPS,
   HUNGER_DECAY_PER_MIN,
   HAPPINESS_DECAY_PER_MIN,
+  HAPPINESS_DECAY_ACTIVE_PER_MIN,
   CLEANLINESS_DECAY_PER_MIN,
   ENERGY_REGEN_PER_MIN,
   HP_REGEN_PCT_PER_MIN,
@@ -204,7 +205,8 @@ export function wakeMonster(monster: Monster): ActionResult {
 // The main simulation step. Advances all time-based stats from monster.lastUpdated to toTime.
 // Called every second by the TICK action in useGameState, and also on page load (via migrateMonster)
 // to catch up on any time that passed while the app was closed.
-export function applyDecay(monster: Monster, toTime: number): Monster {
+// isActive: true when the player has the tab open and visible — halves the happiness drain rate.
+export function applyDecay(monster: Monster, toTime: number, isActive = false): Monster {
   if (monster.isDead) return monster;
 
   const ms = toTime - monster.lastUpdated;
@@ -229,7 +231,8 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
 
   if (!m.isSleeping) {
     // Happiness + cleanliness only decay while awake
-    m.care.happiness   = clamp(m.care.happiness   - HAPPINESS_DECAY_PER_MIN   * minutes);
+    const happDecay = isActive ? HAPPINESS_DECAY_ACTIVE_PER_MIN : HAPPINESS_DECAY_PER_MIN;
+    m.care.happiness   = clamp(m.care.happiness   - happDecay * minutes);
     m.care.cleanliness = clamp(m.care.cleanliness - CLEANLINESS_DECAY_PER_MIN * minutes);
 
     // Poop happiness drain only while awake

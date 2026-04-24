@@ -47,7 +47,7 @@ interface State {
 type Action =
   | { type: "LOAD";                   monster: Monster | null; inventory: Inventory; coins: number }
   | { type: "NEW_MONSTER";            monster: Monster }
-  | { type: "TICK" }
+  | { type: "TICK"; isActive: boolean }
   | { type: "USE_ITEM";               slotIndex: number }
   | { type: "DELETE_ITEM";            slotIndex: number }
   | { type: "BUY_ITEM";               itemId: ItemId; price: number }
@@ -126,7 +126,7 @@ function reducer(state: State, action: Action): State {
 
     case "TICK": {
       if (!state.monster || state.monster.isDead) return state;
-      let m = applyDecay(state.monster, Date.now());
+      let m = applyDecay(state.monster, Date.now(), action.isActive);
 
       // Adventure completion check
       if (m.isAdventuring && m.adventureStart !== null) {
@@ -364,7 +364,7 @@ export function useGameState() {
   const monsterDead = state.monster?.isDead;
   useEffect(() => {
     if (!monsterId || monsterDead) return;
-    const id = setInterval(() => dispatch({ type: "TICK" }), 1000);
+    const id = setInterval(() => dispatch({ type: "TICK", isActive: !document.hidden }), 1000);
     return () => clearInterval(id);
   }, [monsterId, monsterDead]);
 

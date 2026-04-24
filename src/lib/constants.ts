@@ -20,8 +20,9 @@ export const MAX_TRAININGS_PER_DAY = 4;  // resets each in-game day (every 24 re
 export const DIGESTION_MS = 10 * 60 * 1000;  // 10 real minutes after eating → poop
 
 // ── Stat decay / regen (per real minute) ──────────────────────────────────
-export const HUNGER_DECAY_PER_MIN      = 100 / 120; // empties in 2 real hours
-export const HAPPINESS_DECAY_PER_MIN   = 1.5;        // empties in ~67 real minutes
+export const HUNGER_DECAY_PER_MIN             = 100 / 240; // empties in 4 real hours
+export const HAPPINESS_DECAY_PER_MIN          = 100 / 120; // empties in 2 real hours (tab closed / offline)
+export const HAPPINESS_DECAY_ACTIVE_PER_MIN   = 100 / 240; // empties in 4 real hours (tab open and visible)
 export const CLEANLINESS_DECAY_PER_MIN = 0.3;         // empties in ~333 real minutes
 export const ENERGY_REGEN_PER_MIN      = 1 / 15;     // +1 energy per 15 real minutes
 export const HP_REGEN_PCT_PER_MIN      = 0.02;        // 2% of maxHp per minute; paused when sick or injured

@@ -14,11 +14,11 @@ function formatTime(totalSecs: number): string {
 const STAT_DETAILS: Record<string, { title: string; body: string }> = {
   Hunger: {
     title: "Hunger",
-    body:  "Drains fully in ~2 hours. Feed your monster to keep it up. Energy stops regenerating at 0. If hunger stays at 0 for 22 hours, your monster dies.",
+    body:  "Drains fully in 4 hours. Feed your monster to keep it up. Energy stops regenerating at 0. If hunger stays at 0 for 22 hours, your monster dies.",
   },
   Happy: {
     title: "Happiness",
-    body:  "Drains fully in ~67 minutes. Pet your monster or give it treats to cheer it up. Uncleaned poops drain it faster. At 0 for 12 hours → death.",
+    body:  "Drains in 2 hours while you're away, 4 hours while the app is open. Pet your monster or give it treats to cheer it up. Uncleaned poops drain it faster. At 0 for 12 hours → death.",
   },
   Clean: {
     title: "Cleanliness",
