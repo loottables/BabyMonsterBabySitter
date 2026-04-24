@@ -109,7 +109,7 @@ interface Props {
   bare?:   boolean;
 }
 
-const FRAME_MS = 1000 / 15; // ~15 fps
+const FRAME_MS = 1000 / 5; // ~5 fps
 
 export default function MonsterCanvas({ monster, anim, bare }: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
