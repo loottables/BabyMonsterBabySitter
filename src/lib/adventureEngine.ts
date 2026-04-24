@@ -313,7 +313,7 @@ const ADVENTURE_ITEM_POOL: { id: ItemId; weight: number }[] = [
   { id: "kibble",        weight: 35 },
   { id: "treat",         weight: 25 },
   { id: "energy_drink",  weight: 18 },
-  { id: "medicine",      weight: 10 },
+  { id: "potion",        weight: 10 },
   { id: "vaccine",       weight: 7  },
   { id: "first_aid_kit", weight: 4  },
   { id: "name_change",   weight: 1  },

@@ -399,9 +399,11 @@ export function applyItem(monster: Monster, itemId: ItemId): ActionResult {
     case "treat": {
       if (monster.care.happiness >= 98)
         return { ok: false, message: `${monster.name} is already happy!` };
+      const maxEnergy = calcMaxEnergy(monster.rpg.end);
       const m = { ...monster, care: { ...monster.care,
         happiness: clamp(monster.care.happiness + TREAT_HAPPINESS_GAIN),
         hunger:    clamp(monster.care.hunger    + TREAT_HUNGER_GAIN),
+        energy:    clamp(monster.care.energy + 1, 0, maxEnergy),
       }};
       return { ok: true, monster: m, message: `${m.name} loved the treat!` };
     }
@@ -414,7 +416,7 @@ export function applyItem(monster: Monster, itemId: ItemId): ActionResult {
       return { ok: true, monster: m, message: `${m.name} feels energized!` };
     }
 
-    case "medicine": {
+    case "potion": {
       if (monster.rpg.hp >= monster.rpg.maxHp)
         return { ok: false, message: `${monster.name} is already at full HP!` };
       const m = { ...monster, rpg: { ...monster.rpg, hp: monster.rpg.maxHp } };

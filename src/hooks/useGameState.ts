@@ -15,7 +15,7 @@ import {
   consumeSlot, deleteSlot, createDefaultInventory, addToInventory,
 } from "@/lib/inventory";
 import { ITEM_DEFS } from "@/types/items";
-import { STARTING_COINS, ADVENTURE_DURATION_MS } from "@/lib/constants";
+import { STARTING_COINS, ADVENTURE_DURATION_MS, AUTOSLEEP_INACTIVE_MS, AUTOSLEEP_HOUR } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 
 // ── state ──────────────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ interface State {
 type Action =
   | { type: "LOAD";                   monster: Monster | null; inventory: Inventory; coins: number }
   | { type: "NEW_MONSTER";            monster: Monster }
-  | { type: "TICK"; isActive: boolean }
+  | { type: "TICK"; isActive: boolean; autoSleep: boolean }
   | { type: "USE_ITEM";               slotIndex: number }
   | { type: "DELETE_ITEM";            slotIndex: number }
   | { type: "BUY_ITEM";               itemId: ItemId; price: number }
@@ -127,6 +127,11 @@ function reducer(state: State, action: Action): State {
     case "TICK": {
       if (!state.monster || state.monster.isDead) return state;
       let m = applyDecay(state.monster, Date.now(), action.isActive);
+
+      // Auto-sleep: player inactive 15+ min and local time is 8 PM or later
+      if (action.autoSleep && !m.isSleeping && !m.isAdventuring && m.isHatched && !m.isDead) {
+        m = { ...m, isSleeping: true };
+      }
 
       // Adventure completion check
       if (m.isAdventuring && m.adventureStart !== null) {
@@ -311,14 +316,33 @@ const INITIAL: State = {
 
 export function useGameState() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
-  const animTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // tracks the running animation reset timer so it can be cancelled when a new action fires
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // tracks the debounced Supabase save timer so it can be cancelled before a new one starts
+  const animTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null); // tracks the running animation reset timer so it can be cancelled when a new action fires
+  const saveTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null); // tracks the debounced Supabase save timer so it can be cancelled before a new one starts
+  const lastActivityRef  = useRef(Date.now()); // updated on any user interaction; used for auto-sleep
 
   // stateRef always holds the latest state value. Needed because spawnMonster is async —
   // by the time the Supabase call completes, the React state closure would be stale.
   // The useEffect below keeps stateRef in sync on every render.
   const stateRef     = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
+
+  // Track user activity for auto-sleep. Resets on any interaction or when tab regains focus.
+  useEffect(() => {
+    const onActivity   = () => { lastActivityRef.current = Date.now(); };
+    const onVisibility = () => { if (!document.hidden) lastActivityRef.current = Date.now(); };
+    window.addEventListener("mousemove",   onActivity);
+    window.addEventListener("keydown",     onActivity);
+    window.addEventListener("click",       onActivity);
+    window.addEventListener("touchstart",  onActivity);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("mousemove",  onActivity);
+      window.removeEventListener("keydown",    onActivity);
+      window.removeEventListener("click",      onActivity);
+      window.removeEventListener("touchstart", onActivity);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   // On mount: load from Supabase
   useEffect(() => {
@@ -364,7 +388,11 @@ export function useGameState() {
   const monsterDead = state.monster?.isDead;
   useEffect(() => {
     if (!monsterId || monsterDead) return;
-    const id = setInterval(() => dispatch({ type: "TICK", isActive: !document.hidden }), 1000);
+    const id = setInterval(() => {
+      const inactive = Date.now() - lastActivityRef.current >= AUTOSLEEP_INACTIVE_MS;
+      const lateNight = new Date().getHours() >= AUTOSLEEP_HOUR;
+      dispatch({ type: "TICK", isActive: !document.hidden, autoSleep: inactive && lateNight });
+    }, 1000);
     return () => clearInterval(id);
   }, [monsterId, monsterDead]);
 

@@ -1,4 +1,4 @@
-export type ItemId = "kibble" | "treat" | "energy_drink" | "medicine" | "vaccine" | "name_change" | "first_aid_kit" | "bandaid";
+export type ItemId = "kibble" | "treat" | "energy_drink" | "potion" | "vaccine" | "name_change" | "first_aid_kit" | "bandaid";
 
 export interface InventorySlot {
   itemId: ItemId;
@@ -30,7 +30,7 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     id:          "treat",
     name:        "Treat",
     description: "A sweet snack your monster loves.",
-    stats:       ["+40 happiness", "+5 hunger"],
+    stats:       ["+40 happiness", "+5 hunger", "+1 energy"],
     actionLabel: "Give to",
     price:       20,
   },
@@ -42,9 +42,9 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     actionLabel: "Give to",
     price:       75,
   },
-  medicine: {
-    id:          "medicine",
-    name:        "Medicine",
+  potion: {
+    id:          "potion",
+    name:        "Potion",
     description: "Heals your monster back to full HP.",
     stats:       ["Restores HP to max"],
     actionLabel: "Use on",
@@ -85,6 +85,6 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
 };
 
 // Base shop items always available
-export const SHOP_ITEMS: ItemId[] = ["kibble", "treat", "energy_drink", "bandaid", "medicine", "vaccine", "first_aid_kit"];
+export const SHOP_ITEMS: ItemId[] = ["kibble", "treat", "energy_drink", "bandaid", "potion", "vaccine", "first_aid_kit"];
 // Unlocked in the shop after the first free rename is used
 export const SHOP_ITEMS_EXTENDED: ItemId[] = [...SHOP_ITEMS, "name_change"];
