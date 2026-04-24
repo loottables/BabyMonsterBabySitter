@@ -33,7 +33,7 @@ export interface Monster {
   seed: number;        // used by monsterGenerator.ts to draw this monster's unique appearance
   rpg: RPGStats;
   care: CareStats;
-  age: number;         // in-game days elapsed
+  age: number;         // real calendar days elapsed since birthday
   birthday: number;    // unix ms
   lastUpdated: number; // unix ms — used by applyDecay to calculate how much time has passed
 

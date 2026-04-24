@@ -8,8 +8,10 @@ export const SHINY_CHANCE   = 1 / 500;  // 0.2% chance — cosmetic only, no sta
 export const STARTING_COINS = 100;      // coins a brand-new account begins with
 
 // ── Time ───────────────────────────────────────────────────────────────────
-// 1 real minute = 1 in-game hour; 24 real minutes = 1 in-game day
+// Used for training resets (max trainings per day resets every 24 real minutes)
 export const GAME_DAY_MS = 24 * 60 * 1000;
+// Used for the monster's displayed age (increments once per real calendar day)
+export const REAL_DAY_MS = 24 * 60 * 60 * 1000;
 
 export const MAX_POOPS             = 4;  // 4th uncleaned poop triggers sickness risk
 export const MAX_TRAININGS_PER_DAY = 4;  // resets each in-game day (every 24 real minutes)

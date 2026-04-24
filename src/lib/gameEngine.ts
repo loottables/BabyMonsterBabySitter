@@ -2,6 +2,7 @@ import type { Monster, RPGStats, Poop, TrainingType } from "@/types/game";
 import type { ItemId } from "@/types/items";
 import {
   GAME_DAY_MS,
+  REAL_DAY_MS,
   DIGESTION_MS,
   MAX_POOPS,
   HUNGER_DECAY_PER_MIN,
@@ -258,13 +259,15 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
     }
   }
 
-  // Training day reset
-  const currentDay = Math.floor((toTime - m.birthday) / GAME_DAY_MS);
-  if (currentDay > m.lastTrainingDay) {
-    m.trainingsToday   = 0;
-    m.lastTrainingDay  = currentDay;
-    m.age              = currentDay;
+  // Training day reset — resets every 24 real minutes (GAME_DAY_MS)
+  const trainingDay = Math.floor((toTime - m.birthday) / GAME_DAY_MS);
+  if (trainingDay > m.lastTrainingDay) {
+    m.trainingsToday  = 0;
+    m.lastTrainingDay = trainingDay;
   }
+
+  // Age — real calendar days elapsed since birthday
+  m.age = Math.floor((toTime - m.birthday) / REAL_DAY_MS);
 
   // Neglect timer (hunger)
   if (m.care.hunger <= 0) {

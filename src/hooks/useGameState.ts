@@ -56,7 +56,7 @@ type Action =
   | { type: "CLEAN" }
   | { type: "TRAIN";                  exercise: TrainingType }
   | { type: "TOGGLE_TRAIN_MODAL" }
-  | { type: "START_ADVENTURE" }
+  | { type: "START_ADVENTURE"; monster: Monster; message: string }
   | { type: "DISMISS_ADVENTURE_RESULT" }
   | { type: "RUN_FROM_BATTLE" }
   | { type: "ACCEPT_BATTLE";    useFirstAidKit: boolean }
@@ -207,12 +207,8 @@ function reducer(state: State, action: Action): State {
     case "TOGGLE_TRAIN_MODAL":
       return { ...state, showTrain: !state.showTrain };
 
-    case "START_ADVENTURE": {
-      if (!state.monster) return state;
-      const result = doStartAdventure(state.monster);
-      if (!result.ok) return { ...state, message: result.message };
-      return { ...state, monster: result.monster, message: result.message };
-    }
+    case "START_ADVENTURE":
+      return { ...state, monster: action.monster, message: action.message };
 
     case "DISMISS_ADVENTURE_RESULT":
       return { ...state, adventureResult: null };
@@ -418,7 +414,27 @@ export function useGameState() {
   const toggleTrain = useCallback(() => dispatch({ type: "TOGGLE_TRAIN_MODAL" }), []);
   const sleep                  = useCallback(() => dispatch({ type: "SLEEP" }), []);
   const wake                   = useCallback(() => dispatch({ type: "WAKE"  }), []);
-  const adventure              = useCallback(() => dispatch({ type: "START_ADVENTURE" }), []);
+  // Starts an adventure and immediately persists to Supabase (same bypass pattern as spawnMonster).
+  // The debounced save gets cancelled on tab close, so without this the adventure state is lost
+  // if the user navigates away right after sending their monster out.
+  const adventure = useCallback(async () => {
+    const current = stateRef.current;
+    if (!current.monster) return;
+    const result = doStartAdventure(current.monster);
+    if (!result.ok) {
+      dispatch({ type: "SET_MSG", message: result.message });
+      return;
+    }
+    dispatch({ type: "START_ADVENTURE", monster: result.monster, message: result.message });
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("game_saves").upsert(
+      { user_id: user.id, monster: result.monster, inventory: current.inventory, coins: current.coins },
+      { onConflict: "user_id" }
+    );
+  }, []);
   const dismissAdventureResult = useCallback(() => dispatch({ type: "DISMISS_ADVENTURE_RESULT" }), []);
   const runFromBattle          = useCallback(() => dispatch({ type: "RUN_FROM_BATTLE" }), []);
   const acceptBattle           = useCallback((useFirstAidKit: boolean) => dispatch({ type: "ACCEPT_BATTLE", useFirstAidKit }), []);
