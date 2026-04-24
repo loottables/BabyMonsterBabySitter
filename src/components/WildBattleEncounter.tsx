@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { Monster } from "@/types/game";
+import type { Monster, RPGStats } from "@/types/game";
 import type { Inventory } from "@/types/items";
 import type { PendingEncounter } from "@/hooks/useGameState";
 import { wildToDisplayMonster } from "@/lib/battleEngine";
@@ -11,25 +11,45 @@ const MonsterCanvas = dynamic(() => import("./MonsterCanvas"), { ssr: false });
 interface Props {
   encounter:    PendingEncounter;
   playerName:   string;
+  playerRpg:    RPGStats;
   isInjured:    boolean;
   inventory:    Inventory;
   onRun:        () => void;
   onAccept:     (useFirstAidKit: boolean) => void;
 }
 
+// Shows one row of the stat comparison table.
+// The higher value is brighter; equal values are both muted.
+function StatRow({ label, playerVal, wildVal }: { label: string; playerVal: number; wildVal: number }) {
+  const playerWins = playerVal > wildVal;
+  const wildWins   = wildVal   > playerVal;
+  return (
+    <div className="grid grid-cols-3 items-center" style={{ fontSize: "7px" }}>
+      <span className={`text-right pr-3 tabular-nums ${playerWins ? "text-monster-text" : "text-monster-muted"}`}>
+        {playerVal}
+      </span>
+      <span className="text-monster-muted uppercase tracking-widest text-center">{label}</span>
+      <span className={`text-left pl-3 tabular-nums ${wildWins ? "text-monster-text" : "text-monster-muted"}`}>
+        {wildVal}
+      </span>
+    </div>
+  );
+}
+
 export default function WildBattleEncounter({
-  encounter, playerName, isInjured, inventory, onRun, onAccept,
+  encounter, playerName, playerRpg, isInjured, inventory, onRun, onAccept,
 }: Props) {
   const { wildMonster, location } = encounter;
   const displayMonster: Monster   = wildToDisplayMonster(wildMonster);
   const hasFirstAidKit            = inventory.some(s => s?.itemId === "first_aid_kit");
+  const w                         = wildMonster.rpg;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ backgroundColor: "rgba(0,0,0,0.80)" }}
     >
-      <div className="flex flex-col items-center gap-6 w-full max-w-xs border border-monster-border bg-monster-panel px-8 py-8">
+      <div className="flex flex-col items-center gap-5 w-full max-w-xs border border-monster-border bg-monster-panel px-8 py-8">
 
         {/* Location flavour */}
         <p style={{ fontSize: "6px" }} className="text-monster-muted uppercase tracking-widest text-center">
@@ -41,12 +61,27 @@ export default function WildBattleEncounter({
           A wild {wildMonster.name} appeared!
         </p>
 
-        {/* Wild monster sprite */}
-        <div className="flex flex-col items-center gap-2">
-          <MonsterCanvas monster={displayMonster} anim="idle" />
+        {/* Wild monster sprite + level */}
+        <div className="flex flex-col items-center gap-1">
+          <MonsterCanvas monster={displayMonster} anim="idle" bare />
           <p style={{ fontSize: "7px" }} className="text-monster-muted uppercase tracking-wide">
             Lv. {wildMonster.level}
           </p>
+        </div>
+
+        {/* Stat comparison table */}
+        <div className="w-full flex flex-col gap-1 border-t border-monster-border pt-3">
+          {/* Column headers */}
+          <div className="grid grid-cols-3 mb-1" style={{ fontSize: "6px" }}>
+            <span className="text-monster-muted uppercase tracking-widest text-right pr-3">{playerName}</span>
+            <span />
+            <span className="text-monster-muted uppercase tracking-widest text-left pl-3">{wildMonster.name}</span>
+          </div>
+          <StatRow label="ATK" playerVal={playerRpg.atk}   wildVal={w.atk}   />
+          <StatRow label="DEF" playerVal={playerRpg.def}   wildVal={w.def}   />
+          <StatRow label="AGI" playerVal={playerRpg.agi}   wildVal={w.agi}   />
+          <StatRow label="SPD" playerVal={playerRpg.spd}   wildVal={w.spd}   />
+          <StatRow label="HP"  playerVal={playerRpg.maxHp} wildVal={w.maxHp} />
         </div>
 
         {/* Injured notice */}

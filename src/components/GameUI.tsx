@@ -228,7 +228,7 @@ export default function GameUI() {
     <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto px-4">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="grid grid-cols-3 items-center">
         <div className="flex flex-col gap-1">
           {renaming ? (
             <div className="flex flex-col gap-1">
@@ -264,10 +264,11 @@ export default function GameUI() {
             Day {monster.age}
           </p>
         </div>
-        <div className="flex items-center gap-2 border border-monster-border px-3 py-1.5">
+        <div className="flex flex-col items-center gap-0.5">
           <span style={{ fontSize: "7px" }} className="text-monster-muted uppercase tracking-wide">Coins</span>
           <span style={{ fontSize: "9px" }} className="font-bold text-monster-text tabular-nums">{coins.toLocaleString()}</span>
         </div>
+        <div />
       </div>
 
       {/* Main layout */}
@@ -362,6 +363,7 @@ export default function GameUI() {
         <WildBattleEncounter
           encounter={pendingEncounter}
           playerName={monster.name}
+          playerRpg={monster.rpg}
           isInjured={monster.isInjured}
           inventory={inventory}
           onRun={runFromBattle}

@@ -48,11 +48,13 @@ const WILD_NAMES = [
 // Creates a random wild monster scaled near the player's level.
 // Called from adventureEngine.ts when a "wild_battle" event is rolled during an adventure.
 export function generateWildMonster(playerLevel: number, rng: () => number): WildMonster {
-  const level   = Math.floor(rng() * (playerLevel + 2)) + 1;  // 1 to playerLevel+2
+  // Level range: anywhere from 1 up to playerLevel+1 (one level above at most)
+  const level   = Math.max(1, Math.floor(rng() * (playerLevel + 1)) + 1);
   const seed    = Math.floor(rng() * 2 ** 31);
   const name    = WILD_NAMES[Math.floor(rng() * WILD_NAMES.length)];
 
-  const stat    = () => 4 + level * 2 + Math.floor(rng() * 5);
+  // Stats scale at the same rate as player stats (~N+4 average), matching player growth per level
+  const stat    = () => 3 + level + Math.floor(rng() * 4);
   const maxHp   = 15 + level * 6 + Math.floor(rng() * 10);
 
   return {
