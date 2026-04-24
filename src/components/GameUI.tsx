@@ -59,8 +59,8 @@ function SleepOverlay() {
   );
 }
 
-function AdventureOverlay({ adventureStart }: { adventureStart: number }) {
-  const end = adventureStart + ADVENTURE_DURATION_MS;
+function AdventureOverlay({ adventureStart, adventureDuration }: { adventureStart: number; adventureDuration: number | null }) {
+  const end = adventureStart + (adventureDuration ?? ADVENTURE_DURATION_MS);
   const [msLeft, setMsLeft] = useState(() => Math.max(0, end - Date.now()));
 
   useEffect(() => {
@@ -298,7 +298,7 @@ export default function GameUI() {
 
             {monster.isSleeping && <SleepOverlay />}
             {monster.isAdventuring && monster.adventureStart !== null && (
-              <AdventureOverlay adventureStart={monster.adventureStart} />
+              <AdventureOverlay adventureStart={monster.adventureStart} adventureDuration={monster.adventureDuration} />
             )}
           </div>
           {monster.poops.length > 0 && (

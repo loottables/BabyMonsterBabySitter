@@ -35,7 +35,10 @@ interface State {
   isLoading:        boolean;
   showTrain:        boolean;
   adventureResult:  AdventureResultData | null;
+  // pendingEncounter: the "fight or flee" decision screen (WildBattleEncounter.tsx)
   pendingEncounter: PendingEncounter | null;
+  // activeBattle: the actual animated battle in progress (BattleView.tsx);
+  // set when the player chooses to fight, cleared when the battle ends
   activeBattle:     PendingEncounter | null;
 }
 
@@ -68,6 +71,9 @@ type Action =
 
 // ── adventure resolution ───────────────────────────────────────────────────
 
+// Called when the adventure timer finishes (in both LOAD and TICK cases).
+// Hands off to resolveAdventure which uses adventureStart as the RNG seed,
+// then either routes to the encounter screen (wild battle) or applies rewards directly.
 function applyAdventureResult(state: State, monster: Monster): State {
   const seed    = monster.adventureStart!;
   const outcome = resolveAdventure(monster.name, seed, monster.rpg.level, monster.rpg);
@@ -107,7 +113,8 @@ function reducer(state: State, action: Action): State {
       let s: State = { ...state, monster: action.monster, inventory: action.inventory, coins: action.coins, isLoading: false };
       const m = action.monster;
       if (m && m.isAdventuring && m.adventureStart !== null) {
-        if (Date.now() - m.adventureStart >= ADVENTURE_DURATION_MS) {
+        const dur = m.adventureDuration ?? ADVENTURE_DURATION_MS;
+        if (Date.now() - m.adventureStart >= dur) {
           s = applyAdventureResult({ ...s, monster: m }, m);
         }
       }
@@ -123,7 +130,8 @@ function reducer(state: State, action: Action): State {
 
       // Adventure completion check
       if (m.isAdventuring && m.adventureStart !== null) {
-        if (Date.now() - m.adventureStart >= ADVENTURE_DURATION_MS) {
+        const dur = m.adventureDuration ?? ADVENTURE_DURATION_MS;
+        if (Date.now() - m.adventureStart >= dur) {
           return applyAdventureResult(state, m);
         }
       }
@@ -137,9 +145,7 @@ function reducer(state: State, action: Action): State {
       if (!result) return state;
       const itemResult = applyItem(state.monster, result.itemId);
       if (!itemResult.ok) return { ...state, message: itemResult.message };
-      const anim = result.itemId === "kibble" ? "eating"
-                 : result.itemId === "treat"   ? "happy"
-                 : "happy";
+      const anim = result.itemId === "kibble" ? "eating" : "happy";
       return {
         ...state,
         monster:   itemResult.monster,
@@ -309,8 +315,12 @@ const INITIAL: State = {
 
 export function useGameState() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
-  const animTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // tracks the running animation reset timer so it can be cancelled when a new action fires
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // tracks the debounced Supabase save timer so it can be cancelled before a new one starts
+
+  // stateRef always holds the latest state value. Needed because spawnMonster is async —
+  // by the time the Supabase call completes, the React state closure would be stale.
+  // The useEffect below keeps stateRef in sync on every render.
   const stateRef     = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
@@ -352,6 +362,8 @@ export function useGameState() {
   }, [state.monster, state.inventory, state.coins, state.isLoading]);
 
   // 1-second decay tick
+  // monsterId and monsterDead are extracted so the interval only restarts when those
+  // values actually change — not on every render (which would create a new interval each time).
   const monsterId   = state.monster?.id;
   const monsterDead = state.monster?.isDead;
   useEffect(() => {
@@ -378,10 +390,13 @@ export function useGameState() {
 
   // ── public actions ────────────────────────────────────────────────────────
 
+  // Creates a new monster and saves it to Supabase immediately (bypassing the normal debounce).
+  // The debounced save gets cancelled on component unmount, so if the user abandons and
+  // refreshes fast the save would never fire. spawnMonster skips the debounce to avoid that.
   const spawnMonster = useCallback(async () => {
     const m = createMonster();
     dispatch({ type: "NEW_MONSTER", monster: m });
-    // Save immediately — don't rely on debounce which gets cancelled on unmount
+    // Clear any pending debounced save so it doesn't race with this immediate one
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();

@@ -321,6 +321,8 @@ const ADVENTURE_ITEM_POOL: { id: ItemId; weight: number }[] = [
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+// Local seeded RNG — same LCG algorithm as rng.ts but returns a plain function instead of an RNG object.
+// Kept separate so adventure outcomes don't share state with the monster visual generator.
 function seededRandom(seed: number): () => number {
   let s = seed >>> 0;
   return () => {
@@ -329,6 +331,8 @@ function seededRandom(seed: number): () => number {
   };
 }
 
+// Like pick(), but items with higher weight values come up more often.
+// Used to choose the adventure event type and the specific item found.
 function pickWeighted<T>(rng: () => number, pool: { id: T; weight: number }[]): T {
   const total = pool.reduce((n, p) => n + p.weight, 0);
   let roll = rng() * total;
@@ -356,6 +360,9 @@ const EVENT_WEIGHTS: { id: EventType; weight: number }[] = [
   { id: "quiet",       weight: 10 },
 ];
 
+// Determines what happened on the adventure. Called by applyAdventureResult in useGameState.ts
+// when the adventure timer expires. The seed is the adventureStart timestamp, so each adventure
+// gets unique outcomes while remaining fully deterministic (replaying the same seed = same result).
 export function resolveAdventure(
   monsterName:  string,
   seed:         number,

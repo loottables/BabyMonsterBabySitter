@@ -1,9 +1,11 @@
 import { makeRng, type RNG } from "./rng";
 
-// 64×64 grid: 0 = transparent, 1–255 = grayscale (1≈black, 255=white)
+// A flat array of 64×64 = 4096 pixels. 0 = transparent, 1–255 = grayscale brightness.
+// MonsterCanvas.tsx reads this array and draws each pixel onto the canvas, tinted to
+// the monster's color. generateMonster() and generateEgg() both return one of these.
 export type PixelGrid = Uint8Array;
 
-const W = 64;
+const W = 64; // canvas width and height in pixels; all coordinates in this file are in this space
 
 // ── low-level pixel helpers ────────────────────────────────────────────────
 
@@ -35,28 +37,6 @@ function fillEllipse(g: PixelGrid, cx: number, cy: number, rx: number, ry: numbe
     for (let x = cx - rx; x <= cx + rx; x++)
       if ((x - cx) ** 2 / (rx * rx) + (y - cy) ** 2 / (ry * ry) <= 1)
         set(g, x, y, v);
-}
-
-function fillDiamond(g: PixelGrid, cx: number, cy: number, half: number, v: number) {
-  for (let y = cy - half; y <= cy + half; y++)
-    for (let x = cx - half; x <= cx + half; x++)
-      if (Math.abs(x - cx) + Math.abs(y - cy) <= half)
-        set(g, x, y, v);
-}
-
-function drawLine(
-  g: PixelGrid, x0: number, y0: number, x1: number, y1: number, v: number
-) {
-  let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
-  let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy, x = x0, y = y0;
-  for (;;) {
-    set(g, x, y, v);
-    if (x === x1 && y === y1) break;
-    const e2 = 2 * err;
-    if (e2 > -dy) { err -= dy; x += sx; }
-    if (e2 < dx)  { err += dx; y += sy; }
-  }
 }
 
 // ── shaded body fills ──────────────────────────────────────────────────────
@@ -507,7 +487,7 @@ function renderBody(
   const hh1 = drawShapeAt(scratch, shape1, cx, 30, "small", base).hh;
   const hh2 = drawShapeAt(scratch, shape2, cx, 30, "small", base).hh;
 
-  // Negative value = overlap, so shapes fuse into one connected silhouette
+  // Negative gap makes the two shapes overlap so they fuse into one connected silhouette
   const GAP = -4;
   // combined center Y = cy1 + hh2 + GAP/2 → set to 30
   const cy1 = Math.round(30 - hh2 - GAP / 2);
@@ -528,6 +508,8 @@ function renderBody(
     bottom:      r2.attach.bottom,
   };
 
+  // faceCy is the y-center of the top shape's face — eyes and mouth are placed relative to it,
+  // not the overall body center, so faces always appear on the top shape
   return { cx, cy: r1.faceCy, hw: Math.max(r1.hw, r2.hw), hh: r1.hh, attach };
 }
 
@@ -566,6 +548,10 @@ function drawSparkle(g: PixelGrid, ex: number, ey: number, r: number) {
   set(g, sx,     sy - 1, 250);
 }
 
+// Draws the base eye layers shared by most eye styles: white sclera, dark iris ring, darker pupil,
+// optional eyelid line across the top, and a white sparkle highlight.
+// Called by round, oval, wide, angry, sleepy, sparkly, star, narrow, and glare styles.
+// withLid is a per-monster boolean (50% chance) set in generateMonster.
 function drawEyeCore(g: PixelGrid, ex: number, ey: number, rx: number, ry: number, withLid: boolean) {
   // sclera → iris → pupil → eyelid → sparkle
   eyeEllipse(g, ex, ey, rx, ry, 238);                              // white
@@ -946,7 +932,7 @@ function addAntenna(g: PixelGrid, p: Pt, style: AntennaStyle, col: number) {
   }
 }
 
-function addHorn(g: PixelGrid, p: Pt, side: "left" | "right", col: number) {
+function addHorn(g: PixelGrid, p: Pt, col: number) {
   const dark = Math.max(2, col - 40);
   fillRect(g, p.x - 2, p.y - 2, 4, 2, col);
   fillRect(g, p.x - 1, p.y - 4, 3, 2, col);
@@ -1062,8 +1048,7 @@ function addArm(g: PixelGrid, p: Pt, side: "left" | "right", style: ArmStyle, co
 
 type LegStyle = "stubby" | "long" | "paw";
 
-function addLeg(g: PixelGrid, p: Pt, side: "left" | "right", style: LegStyle, col: number) {
-  const s = side === "left" ? -1 : 1;
+function addLeg(g: PixelGrid, p: Pt, style: LegStyle, col: number) {
   const dark = Math.max(2, col - 35);
 
   switch (style) {
@@ -1187,7 +1172,8 @@ export function generateMonster(seed: number): PixelGrid {
     ? (rng.nextBool(0.4) ? shape1 : rng.pick(shapes))
     : null;
 
-  // Body color: 90–185
+  // base: the monster's body grayscale brightness (90–185); MonsterCanvas tints it to color
+  // dark: a darker shade derived from base, used for outlines, pupils, and shadow details
   const base = 90 + rng.nextInt(0, 95);
   const dark = Math.max(15, base - 55);
 
@@ -1200,8 +1186,8 @@ export function generateMonster(seed: number): PixelGrid {
   // Outline pass
   outlineBody(g, dark);
 
-  // Snapshot the body silhouette — used to clip internal features so they
-  // never bleed outside the body (important for curved/diamond shapes).
+  // Snapshot the grid after the body is drawn. Applied after face features (eyes, mouth, nose, blush)
+  // to erase anything that bled outside the body outline — important for narrow shapes like diamond.
   const bodyMask = new Uint8Array(g);
 
   // ── eyes ──
@@ -1239,8 +1225,8 @@ export function generateMonster(seed: number): PixelGrid {
     const antennaStyles: AntennaStyle[] = ["ball", "fork", "star"];
     addAntenna(g, attach.top, rng.pick(antennaStyles), base);
   } else if (topRoll < 0.35) {
-    addHorn(g, attach.topLeft,  "left",  base);
-    addHorn(g, attach.topRight, "right", base);
+    addHorn(g, attach.topLeft,  base);
+    addHorn(g, attach.topRight, base);
   } else if (topRoll < 0.45) {
     addSingleHorn(g, attach.top, base);
   } else if (topRoll < 0.55) {
@@ -1261,8 +1247,8 @@ export function generateMonster(seed: number): PixelGrid {
   // ── legs ──
   const legStyles: LegStyle[] = ["stubby", "long", "paw"];
   const legStyle = rng.pick(legStyles);
-  addLeg(g, attach.bottomLeft,  "left",  legStyle, base);
-  addLeg(g, attach.bottomRight, "right", legStyle, base);
+  addLeg(g, attach.bottomLeft,  legStyle, base);
+  addLeg(g, attach.bottomRight, legStyle, base);
 
   // ── tail ──
   if (rng.nextBool(0.45)) {

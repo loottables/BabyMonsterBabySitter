@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -11,16 +11,18 @@ export default function UpdatePasswordPage() {
   const [message,  setMessage]  = useState("");
   const [loading,  setLoading]  = useState(false);
   const [ready,    setReady]    = useState(false);
-  const router = useRouter();
-  const supabase = createClient();
+  const router   = useRouter();
+  // Memoized so the same client instance is used for the lifetime of the page
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    // Supabase sets the session from the URL fragment automatically on load.
-    // Wait for the auth state to settle before showing the form.
-    supabase.auth.onAuthStateChange((event) => {
+    // Supabase auto-exchanges the recovery token from the URL fragment on load.
+    // Wait for PASSWORD_RECOVERY before showing the form.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") setReady(true);
     });
-  }, [supabase.auth]);
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

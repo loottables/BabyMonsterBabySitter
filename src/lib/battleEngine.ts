@@ -45,6 +45,8 @@ const WILD_NAMES = [
 
 // ── Generation ─────────────────────────────────────────────────────────────
 
+// Creates a random wild monster scaled near the player's level.
+// Called from adventureEngine.ts when a "wild_battle" event is rolled during an adventure.
 export function generateWildMonster(playerLevel: number, rng: () => number): WildMonster {
   const level   = Math.floor(rng() * (playerLevel + 2)) + 1;  // 1 to playerLevel+2
   const seed    = Math.floor(rng() * 2 ** 31);
@@ -61,6 +63,10 @@ export function generateWildMonster(playerLevel: number, rng: () => number): Wil
 
 // ── Simulation ─────────────────────────────────────────────────────────────
 
+// Runs the entire battle upfront and returns a log of every round.
+// Called by adventureEngine.ts when resolving an adventure with a wild encounter.
+// BattleView.tsx then replays the pre-calculated rounds one-by-one for the animated display —
+// the battle outcome is already decided before the player sees any of it.
 export function simulateBattle(
   playerRpg:  RPGStats,
   wildRpg:    WildMonsterRpg,
@@ -132,7 +138,10 @@ export function simulateBattle(
 }
 
 // ── Display shim ───────────────────────────────────────────────────────────
-// Creates a minimal Monster object so MonsterCanvas can render a wild monster.
+// Wraps a WildMonster in a full Monster object so MonsterCanvas can render it.
+// MonsterCanvas only needs the seed (for appearance) and a few RPG stats (for color tinting).
+// All other fields are dummy values — this object is never saved or used for game logic.
+// Used by WildBattleEncounter.tsx and BattleView.tsx.
 
 export function wildToDisplayMonster(wild: WildMonster): Monster {
   const t = Date.now();

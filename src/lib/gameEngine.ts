@@ -31,12 +31,23 @@ import {
   TRAINING_EXERCISES,
   EGG_HATCH_MS,
   SHINY_CHANCE,
+  INJURY_HEAL_MS,
 } from "./constants";
+
+// Max energy a monster can hold: base 5 + 1 per 5 END points.
+// Used by StatsPanel.tsx (display), applyDecay (regen cap), and startAdventure (cost check).
+export function calcMaxEnergy(end: number): number {
+  return 5 + Math.floor(end / 5);
+}
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
+// Keeps a stat within [lo, hi]; defaults to the 0–100 care stat range.
 const clamp = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
+
+// Generates a short random ID string — used for monster IDs and poop IDs.
 const uid   = () => Math.random().toString(36).slice(2, 9);
+
 const now   = () => Date.now();
 
 function randomPoopPos(): Poop {
@@ -48,6 +59,8 @@ function randomPoopPos(): Poop {
   };
 }
 
+// Called by grantExp and trainMonster whenever exp is added.
+// Loops until all accumulated exp is consumed, so multiple level-ups can happen at once.
 function levelUp(rpg: RPGStats): RPGStats {
   let r = { ...rpg };
   while (r.exp >= r.expToNext) {
@@ -101,8 +114,7 @@ const MONSTER_NAMES = [
 ];
 
 export function createMonster(): Monster {
-  const t   = now();
-  const currentDay = Math.floor((t - t) / GAME_DAY_MS); // day 0
+  const t = now();
   const rpg = randomStarterRpg();
   return {
     id:              uid(),
@@ -113,13 +125,13 @@ export function createMonster(): Monster {
       hunger:      100,
       happiness:   100,
       cleanliness: 100,
-      energy:      5 + Math.floor(rpg.end / 5),
+      energy:      calcMaxEnergy(rpg.end),
     },
     age:              0,
     birthday:         t,
     lastUpdated:      t,
     trainingsToday:   0,
-    lastTrainingDay:  currentDay,
+    lastTrainingDay:  0,
     mealsPending:     0,
     nextPoopTime:     null,
     poops:            [],
@@ -135,21 +147,24 @@ export function createMonster(): Monster {
     lastPetTime:            null,
     isHatched:        EGG_HATCH_MS === 0,
     hatchTime:        t + EGG_HATCH_MS,
-    isAdventuring:    false,
-    adventureStart:   null,
+    isAdventuring:     false,
+    adventureStart:    null,
+    adventureDuration: null,
     isInjured:        false,
     injuredHealStart: null,
     isSleeping:       false,
   };
 }
 
+// Adds exp to the monster and triggers level-up(s) if the threshold is crossed.
+// Called by useGameState after adventures (non-battle), battle completions, and training.
 export function grantExp(monster: Monster, exp: number): Monster {
   const prevLevel = monster.rpg.level;
   let rpg = { ...monster.rpg, exp: monster.rpg.exp + exp };
   rpg = levelUp(rpg);
   let care = monster.care;
   if (rpg.level > prevLevel) {
-    const maxEnergy = 5 + Math.floor(rpg.end / 5);
+    const maxEnergy = calcMaxEnergy(rpg.end);
     care = { ...care, energy: care.energy < maxEnergy / 2 ? maxEnergy / 2 : maxEnergy };
   }
   return { ...monster, rpg, care };
@@ -163,9 +178,10 @@ export function startAdventure(monster: Monster): ActionResult {
   if (Math.round(monster.care.energy) < 1) return { ok: false, message: "Not enough energy!" };
   const m: Monster = {
     ...monster,
-    isAdventuring:  true,
-    adventureStart: now(),
-    isSleeping:     false,
+    isAdventuring:     true,
+    adventureStart:    now(),
+    adventureDuration: Math.floor(Math.random() * 21 + 5) * 1000,
+    isSleeping:        false,
     care: { ...monster.care, energy: clamp(monster.care.energy - 1) },
   };
   return { ok: true, monster: m, message: `${m.name} sets out on an adventure!` };
@@ -186,6 +202,9 @@ export function wakeMonster(monster: Monster): ActionResult {
 
 // ── offline + tick decay ───────────────────────────────────────────────────
 
+// The main simulation step. Advances all time-based stats from monster.lastUpdated to toTime.
+// Called every second by the TICK action in useGameState, and also on page load (via migrateMonster)
+// to catch up on any time that passed while the app was closed.
 export function applyDecay(monster: Monster, toTime: number): Monster {
   if (monster.isDead) return monster;
 
@@ -331,7 +350,7 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
     if (m.rpg.hp >= m.rpg.maxHp) {
       if (m.injuredHealStart === null) {
         m.injuredHealStart = toTime;
-      } else if (toTime - m.injuredHealStart >= 30 * 60 * 1000) {
+      } else if (toTime - m.injuredHealStart >= INJURY_HEAL_MS) {
         m.isInjured        = false;
         m.injuredHealStart = null;
       }
@@ -349,6 +368,9 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
 
 // ── actions ────────────────────────────────────────────────────────────────
 
+// Return type for all player action functions (feed, pet, train, etc.).
+// If ok is true, monster holds the updated state. If ok is false, message explains why it failed.
+// Used by the reducer in useGameState.ts to either apply the new state or show the error message.
 export type ActionResult =
   | { ok: true;  monster: Monster; message: string }
   | { ok: false; message: string };
@@ -393,7 +415,7 @@ export function applyItem(monster: Monster, itemId: ItemId): ActionResult {
     }
 
     case "energy_drink": {
-      const maxEnergy = 5 + Math.floor(monster.rpg.end / 5);
+      const maxEnergy = calcMaxEnergy(monster.rpg.end);
       if (monster.care.energy >= maxEnergy)
         return { ok: false, message: `${monster.name} is already full of energy!` };
       const m = { ...monster, care: { ...monster.care, energy: maxEnergy } };
@@ -527,13 +549,9 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
 }
 
 // ── persistence ────────────────────────────────────────────────────────────
-
-const KEY = "bmbs_monster_v1";
-
-export function saveMonster(m: Monster) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(m));
-}
+// migrateMonster is called in useGameState.ts when loading a save from Supabase.
+// It backfills any Monster fields that were added after the save was originally written
+// (so old saves don't break), then runs applyDecay to catch up on offline time.
 
 export function migrateMonster(raw: unknown): Monster {
   const m = raw as Monster;
@@ -552,26 +570,12 @@ export function migrateMonster(raw: unknown): Monster {
   if (m.dirtyStart          === undefined) m.dirtyStart          = null;
   if (m.lastPetTime         === undefined) m.lastPetTime         = null;
   if (m.hasBeenRenamed      === undefined) m.hasBeenRenamed      = false;
-  if (m.isAdventuring       === undefined) m.isAdventuring       = false;
-  if (m.adventureStart      === undefined) m.adventureStart      = null;
+  if (m.isAdventuring        === undefined) m.isAdventuring        = false;
+  if (m.adventureStart       === undefined) m.adventureStart       = null;
+  if (m.adventureDuration    === undefined) m.adventureDuration    = null;
   if (m.isInjured           === undefined) m.isInjured           = false;
   if (m.injuredHealStart    === undefined) m.injuredHealStart    = null;
   if (m.isSleeping          === undefined) m.isSleeping          = false;
   return applyDecay(m, Date.now());
 }
 
-export function loadMonster(): Monster | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    return migrateMonster(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
-
-export function clearMonster() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(KEY);
-}
