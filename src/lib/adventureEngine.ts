@@ -380,7 +380,7 @@ export function resolveAdventure(
     const battleResult = simulateBattle(
       playerRpg, wildMonster.rpg,
       playerLevel, wildMonster.level,
-      playerRpg.expToNext, rng,
+      rng,
     );
     return {
       narrative:   "",

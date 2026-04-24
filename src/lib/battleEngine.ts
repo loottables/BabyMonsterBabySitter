@@ -72,7 +72,6 @@ export function simulateBattle(
   wildRpg:    WildMonsterRpg,
   playerLevel: number,
   wildLevel:   number,
-  expToNext:   number,
   rng: () => number,
 ): BattleResult {
   let pHp = playerRpg.hp;
@@ -171,13 +170,13 @@ export function wildToDisplayMonster(wild: WildMonster): Monster {
     hasBeenRenamed:        false,
     neglectStart:          null,
     sadStart:              null,
-    lastHungerEnergyDrain: null,
     isSick:                false,
     sickStart:             null,
     dirtyStart:            null,
     lastPetTime:           null,
     isAdventuring:         false,
     adventureStart:        null,
+    adventureDuration:     null,
     isInjured:             false,
     injuredHealStart:      null,
     isSleeping:            false,

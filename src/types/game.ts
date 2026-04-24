@@ -56,9 +56,6 @@ export interface Monster {
   // Timer: if happiness stays at 0 for SADNESS_DEATH_MS (12h), the monster dies.
   sadStart: number | null;              // timestamp when happiness first hit 0; null when happiness > 0
 
-  // Tracks the last time energy was drained while starving (1 energy per 5 min while hunger = 0).
-  lastHungerEnergyDrain: number | null; // null when not starving
-
   isSick: boolean;           // pauses HP regen; causes extra happiness drain; cured by vaccine item
   sickStart: number | null;  // timestamp when sickness began; used to track how long they've been sick
 

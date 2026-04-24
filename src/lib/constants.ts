@@ -32,7 +32,6 @@ export const SICK_FROM_POOP_MS   = 15 * 60 * 1000;  // 15 min with 3+ poops → 
 export const SICK_FROM_HUNGER_MS = 30 * 60 * 1000;  // 30 min at 0 hunger → sick
 export const NEGLECT_DEATH_MS    = 22 * 60 * 60 * 1000;  // 22h at 0 hunger → death
 export const SADNESS_DEATH_MS    = 12 * 60 * 60 * 1000;  // 12h at 0 happiness → death
-export const HUNGER_ENERGY_DRAIN_MS = 5 * 60 * 1000;     // drain 1 energy per 5 min while starving
 // Full HP must be held for this long to clear the injured status
 export const INJURY_HEAL_MS      = 30 * 60 * 1000;
 

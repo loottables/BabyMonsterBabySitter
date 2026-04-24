@@ -16,7 +16,6 @@ import {
   INJURED_HAPPINESS_DRAIN_PER_MIN,
   NEGLECT_DEATH_MS,
   SADNESS_DEATH_MS,
-  HUNGER_ENERGY_DRAIN_MS,
   FEED_HUNGER_GAIN,
   FEED_HAPPINESS_GAIN,
   TREAT_HAPPINESS_GAIN,
@@ -140,7 +139,6 @@ export function createMonster(): Monster {
     isDead:           false,
     neglectStart:           null,
     sadStart:               null,
-    lastHungerEnergyDrain:  null,
     isSick:                 false,
     sickStart:              null,
     dirtyStart:             null,
@@ -221,10 +219,12 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
 
   const minutes = ms / 60000;
 
-  // Hunger always decays; energy always regens
+  // Hunger always decays; energy regens only while hunger > 0 (paused when starving)
   m.care.hunger = clamp(m.care.hunger - HUNGER_DECAY_PER_MIN * minutes);
   const maxEnergy = 5 + Math.floor(m.rpg.end / 5);
-  m.care.energy = clamp(m.care.energy + ENERGY_REGEN_PER_MIN * minutes, 0, maxEnergy);
+  if (m.care.hunger > 0) {
+    m.care.energy = clamp(m.care.energy + ENERGY_REGEN_PER_MIN * minutes, 0, maxEnergy);
+  }
 
   if (!m.isSleeping) {
     // Happiness + cleanliness only decay while awake
@@ -278,22 +278,8 @@ export function applyDecay(monster: Monster, toTime: number): Monster {
       m.deathTime = m.neglectStart + NEGLECT_DEATH_MS;
     }
 
-    // Energy drain while starving: 1 immediately, then 1 per 5 min
-    const drainStart = m.neglectStart;
-    if (m.lastHungerEnergyDrain === null) {
-      // First drain — immediate when hunger hits 0
-      if (m.care.energy > 0) m.care.energy = Math.max(0, m.care.energy - 1);
-      m.lastHungerEnergyDrain = drainStart;
-    } else {
-      const drainsDue = Math.floor((toTime - m.lastHungerEnergyDrain) / HUNGER_ENERGY_DRAIN_MS);
-      if (drainsDue > 0) {
-        if (m.care.energy > 0) m.care.energy = Math.max(0, m.care.energy - drainsDue);
-        m.lastHungerEnergyDrain += drainsDue * HUNGER_ENERGY_DRAIN_MS;
-      }
-    }
   } else {
-    m.neglectStart           = null;
-    m.lastHungerEnergyDrain  = null;
+    m.neglectStart = null;
   }
 
   // Sadness timer (happiness)
@@ -559,7 +545,6 @@ export function migrateMonster(raw: unknown): Monster {
   if (m.isHatched           === undefined) m.isHatched           = true;
   if (m.rpg.end             === undefined) m.rpg.end             = 5;
   if (m.rpg.str             === undefined) m.rpg.str             = 5;
-  if (m.lastHungerEnergyDrain === undefined) m.lastHungerEnergyDrain = null;
   if ((m as unknown as Record<string, unknown>).lastPoopTime !== undefined)
     delete (m as unknown as Record<string, unknown>).lastPoopTime;
   if (m.mealsPending        === undefined) m.mealsPending        = 0;
