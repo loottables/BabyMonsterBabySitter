@@ -46,26 +46,31 @@ function EggCountdown({ hatchTime }: { hatchTime: number }) {
 }
 
 // Pixel-art hand sprite — upright, palm facing viewer, thumb on right.
+// Cols: 0-1 pinky | gap | 3-4 ring | gap | 6-7 middle | gap | 9-10 index | 11 thumb (palm only)
+// Finger heights: middle tallest, ring+index mid, pinky shortest — gives natural stagger.
 // "0" = transparent  "1" = main fill  "3" = darker detail (knuckles / crease)
 const HAND_ROWS = [
-  "110110110110",  // fingertips (pinky · ring · middle · index, 2 px each)
+  "000000130000",  // middle fingertip only (col 7 darker)
+  "000000110000",
+  "000130110130",  // ring (cols 3-4) + index (cols 9-10) tips, darker tip pixel
+  "000110110110",
+  "130110110110",  // pinky (cols 0-1) joins, darker tip
   "110110110110",
-  "130130130130",  // knuckle row — inner pixel of each finger darkened
+  "110110110110",
+  "110110110110",
+  "110110110110",
   "111111111110",  // fingers merge into upper palm
-  "111111111110",
-  "111111111130",  // thumb / index separation crease at col 10
+  "111133111110",  // palm crease detail
   "111111111111",  // thumb appears (col 11)
   "111111111111",
-  "011111111110",  // upper palm
-  "011133111110",  // palm crease line (cols 3–4)
-  "001111111100",  // lower palm
+  "011111111111",
+  "011111111110",  // thumb ends
+  "001111111100",  // wrist
   "001111111100",
-  "000111111000",  // wrist
-  "000111111000",
 ];
-const HAND_PX      = 6;   // CSS px per grid pixel
+const HAND_PX      = 5;   // CSS px per grid pixel
 const HAND_W       = 12;  // grid columns
-const HAND_H       = 14;  // grid rows
+const HAND_H       = 17;  // grid rows
 const HAND_PAD     = 1;   // 1 grid pixel of padding so the outer outline has room
 const C_FILL       = "rgb(175,175,175)";
 const C_DETAIL     = "rgb(100,100,100)";
@@ -111,8 +116,8 @@ function PetHandOverlay() {
 
   if (!alive) return null;
 
-  const canvasW = (HAND_W + 2 * HAND_PAD) * HAND_PX; // 84 px
-  const canvasH = (HAND_H + 2 * HAND_PAD) * HAND_PX; // 96 px
+  const canvasW = (HAND_W + 2 * HAND_PAD) * HAND_PX; // 70 px
+  const canvasH = (HAND_H + 2 * HAND_PAD) * HAND_PX; // 95 px
 
   return (
     <>
