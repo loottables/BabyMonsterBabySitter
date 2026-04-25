@@ -47,7 +47,7 @@ interface State {
 // ── actions ────────────────────────────────────────────────────────────────
 
 type Action =
-  | { type: "LOAD";                   monster: Monster | null; inventory: Inventory; coins: number }
+  | { type: "LOAD";                   monster: Monster | null; inventory: Inventory; coins: number; pendingEncounter: PendingEncounter | null }
   | { type: "NEW_MONSTER";            monster: Monster }
   | { type: "TICK"; isActive: boolean; autoSleep: boolean }
   | { type: "USE_ITEM";               slotIndex: number }
@@ -113,8 +113,8 @@ function applyAdventureResult(state: State, monster: Monster): State {
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "LOAD": {
-      let s: State = { ...state, monster: action.monster, inventory: action.inventory, coins: action.coins, isLoading: false };
       const m = action.monster;
+      let s: State = { ...state, monster: m, inventory: action.inventory, coins: action.coins, pendingEncounter: action.pendingEncounter, isLoading: false };
       if (m && m.isAdventuring && m.adventureStart !== null) {
         const dur = m.adventureDuration ?? ADVENTURE_DURATION_MS;
         if (Date.now() - m.adventureStart >= dur) {
@@ -356,14 +356,15 @@ export function useGameState() {
       if (!user || cancelled) return;
       const { data } = await supabase
         .from("game_saves")
-        .select("monster, inventory, coins")
+        .select("monster, inventory, coins, pending_encounter")
         .eq("user_id", user.id)
         .single();
       if (cancelled) return;
       const m   = data?.monster   ? migrateMonster(data.monster)   : null;
       const inv = data?.inventory ?? createDefaultInventory();
       const c   = data?.coins     ?? STARTING_COINS;
-      dispatch({ type: "LOAD", monster: m, inventory: inv, coins: c });
+      const pe  = (data as { pending_encounter?: PendingEncounter | null })?.pending_encounter ?? null;
+      dispatch({ type: "LOAD", monster: m, inventory: inv, coins: c, pendingEncounter: pe });
     })();
     return () => { cancelled = true; };
   }, []);
@@ -377,12 +378,12 @@ export function useGameState() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       await supabase.from("game_saves").upsert(
-        { user_id: user.id, monster: state.monster, inventory: state.inventory, coins: state.coins },
+        { user_id: user.id, monster: state.monster, inventory: state.inventory, coins: state.coins, pending_encounter: state.pendingEncounter },
         { onConflict: "user_id" }
       );
     }, 1000);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [state.monster, state.inventory, state.coins, state.isLoading]);
+  }, [state.monster, state.inventory, state.coins, state.pendingEncounter, state.isLoading]);
 
   // 1-second decay tick
   // monsterId and monsterDead are extracted so the interval only restarts when those

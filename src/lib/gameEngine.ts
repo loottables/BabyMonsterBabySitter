@@ -33,6 +33,8 @@ import {
   EGG_HATCH_MS,
   SHINY_CHANCE,
   INJURY_HEAL_MS,
+  AUTOSLEEP_HOUR,
+  AUTOSLEEP_WAKE_HOUR,
 } from "./constants";
 
 // Max energy a monster can hold: base 5 + 1 per 5 END points.
@@ -390,6 +392,39 @@ export function applyDecay(monster: Monster, toTime: number, isActive = false): 
   return m;
 }
 
+// ── offline catch-up with auto-sleep ──────────────────────────────────────
+
+// Returns the timestamp when the monster should auto-sleep offline.
+// If lastUpdated is already in the sleep window (8 PM–8 AM), sleep starts immediately.
+// Otherwise returns the next 8 PM.
+function offlineSleepStart(ts: number): number {
+  const h = new Date(ts).getHours();
+  if (h >= AUTOSLEEP_HOUR || h < AUTOSLEEP_WAKE_HOUR) return ts;
+  const d    = new Date(ts);
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate(), AUTOSLEEP_HOUR, 0, 0, 0);
+  return next.getTime();
+}
+
+// Offline catch-up that auto-sleeps the monster at 8 PM if the app was closed.
+// The monster stays sleeping until the player manually wakes it — there is no auto-wake.
+// Manually-sleeping or adventuring monsters decay straight through without splitting.
+export function applyOfflineDecay(monster: Monster, toTime: number): Monster {
+  if (monster.isSleeping || monster.isAdventuring || monster.isDead || !monster.isHatched) {
+    return applyDecay(monster, toTime, false);
+  }
+
+  const sleepAt = offlineSleepStart(monster.lastUpdated);
+
+  if (sleepAt >= toTime) {
+    // Never reached 8 PM during offline period — decay fully awake
+    return applyDecay(monster, toTime, false);
+  }
+
+  // Decay awake up to 8 PM, then sleeping the rest of the way
+  const afterAwake = applyDecay(monster, sleepAt, false);
+  return applyDecay({ ...afterAwake, isSleeping: true }, toTime, false);
+}
+
 // ── actions ────────────────────────────────────────────────────────────────
 
 // Return type for all player action functions (feed, pet, train, etc.).
@@ -605,6 +640,6 @@ export function migrateMonster(raw: unknown): Monster {
   if (m.isInjured           === undefined) m.isInjured           = false;
   if (m.injuredHealStart    === undefined) m.injuredHealStart    = null;
   if (m.isSleeping          === undefined) m.isSleeping          = false;
-  return applyDecay(m, Date.now());
+  return applyOfflineDecay(m, Date.now());
 }
 

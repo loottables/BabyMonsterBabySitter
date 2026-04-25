@@ -35,12 +35,13 @@ create or replace trigger on_auth_user_created
 
 -- ── Game saves ─────────────────────────────────────────────────────────────
 create table if not exists game_saves (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid unique not null references auth.users on delete cascade,
-  monster     jsonb,
-  inventory   jsonb default '[]'::jsonb,
-  coins       integer default 100,
-  updated_at  timestamptz default now()
+  id                uuid primary key default gen_random_uuid(),
+  user_id           uuid unique not null references auth.users on delete cascade,
+  monster           jsonb,
+  inventory         jsonb default '[]'::jsonb,
+  coins             integer default 100,
+  pending_encounter jsonb default null,
+  updated_at        timestamptz default now()
 );
 
 alter table game_saves enable row level security;
