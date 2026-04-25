@@ -22,7 +22,7 @@ const STAT_DETAILS: Record<string, { title: string; body: string }> = {
   },
   Clean: {
     title: "Cleanliness",
-    body:  "Drains slowly over time. 3 or more uncleaned poops for 15 minutes → your monster gets sick.",
+    body:  "Drains slowly over time. 2 or more uncleaned poops for 15 minutes → your monster gets sick.",
   },
   Energy: {
     title: "Energy",

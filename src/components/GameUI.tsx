@@ -443,7 +443,7 @@ export default function GameUI() {
                   {monster.isInjured             && <span className="animate-pulse cursor-help" title="Use a First Aid Kit or keep your monster at full HP for 30 minutes to recover.">! Injured</span>}
                   {monster.care.hunger <= 20     && <span className="animate-pulse">! Hungry</span>}
                   {monster.care.happiness <= 20  && <span className="animate-pulse">! Sad</span>}
-                  {monster.poops.length >= 3     && <span className="animate-pulse">! Dirty</span>}
+                  {monster.poops.length >= 2     && <span className="animate-pulse">! Dirty</span>}
                 </div>
               )}
             </div>

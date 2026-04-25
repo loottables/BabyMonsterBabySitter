@@ -314,14 +314,14 @@ export function applyDecay(monster: Monster, toTime: number, isActive = false): 
       const newPoops = [...m.poops];
       let pending = m.mealsPending;
       let nextPoop = m.nextPoopTime;
-      while (pending > 0 && nextPoop <= toTime) {
+      while (pending >= 2 && nextPoop <= toTime) {
         if (newPoops.length < MAX_POOPS) newPoops.push(randomPoopPos());
-        pending--;
-        nextPoop = pending > 0 ? nextPoop + DIGESTION_MS : 0;
+        pending -= 2;
+        nextPoop = pending >= 2 ? nextPoop + DIGESTION_MS : 0;
       }
       m.poops        = newPoops;
       m.mealsPending = pending;
-      m.nextPoopTime = pending > 0 ? nextPoop : null;
+      m.nextPoopTime = pending >= 2 ? nextPoop : null;
     }
   }
 
@@ -370,7 +370,7 @@ export function applyDecay(monster: Monster, toTime: number, isActive = false): 
   // Sickness triggers
   if (!m.isDead && !m.isSick) {
     // Dirty too long (3+ poops)
-    if (m.poops.length >= 3) {
+    if (m.poops.length >= 2) {
       if (m.dirtyStart === null) m.dirtyStart = toTime;
       if (toTime - m.dirtyStart >= SICK_FROM_POOP_MS) m.isSick = true;
     } else {
@@ -415,7 +415,7 @@ export function applyDecay(monster: Monster, toTime: number, isActive = false): 
   }
 
   // Reset dirtyStart if poops cleared (and not sick from it already)
-  if (m.poops.length < 3 && !m.isSick) m.dirtyStart = null;
+  if (m.poops.length < 2 && !m.isSick) m.dirtyStart = null;
 
   m.lastUpdated = toTime;
   return m;
@@ -478,7 +478,7 @@ export function feedMonster(monster: Monster): ActionResult {
       happiness: clamp(monster.care.happiness + FEED_HAPPINESS_GAIN),
     },
     mealsPending: monster.mealsPending + 1,
-    nextPoopTime: monster.nextPoopTime ?? t + DIGESTION_MS,
+    nextPoopTime: (monster.nextPoopTime === null && monster.mealsPending + 1 >= 2) ? t + DIGESTION_MS : monster.nextPoopTime,
   };
 
   return { ok: true, monster: m, message: `${m.name} munches happily!` };

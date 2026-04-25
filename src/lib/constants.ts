@@ -13,7 +13,7 @@ export const GAME_DAY_MS = 24 * 60 * 1000;
 // Used for the monster's displayed age (increments once per real calendar day)
 export const REAL_DAY_MS = 24 * 60 * 60 * 1000;
 
-export const MAX_POOPS             = 4;  // 4th uncleaned poop triggers sickness risk
+export const MAX_POOPS             = 4;  // display cap; sickness triggers at 2+ poops for 15 min
 export const MAX_TRAININGS_PER_DAY = 4;  // resets each in-game day (every 24 real minutes)
 
 // Digestion: each meal produces a poop after this delay
