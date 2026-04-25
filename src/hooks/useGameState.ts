@@ -62,8 +62,8 @@ type Action =
   | { type: "ACCEPT_BATTLE";    useFirstAidKit: boolean }
   | { type: "COMPLETE_BATTLE" }
   | { type: "SELL_ITEM";              slotIndex: number }
-  | { type: "SLEEP" }
-  | { type: "WAKE" }
+  | { type: "SLEEP"; monster: Monster; message: string }
+  | { type: "WAKE";  monster: Monster; message: string }
   | { type: "RESET" }
   | { type: "WIPE_ALL" }
   | { type: "SET_ANIM";               anim: AnimationState }
@@ -265,19 +265,11 @@ function reducer(state: State, action: Action): State {
       return { ...state, inventory: inv, coins: state.coins + sellPrice };
     }
 
-    case "SLEEP": {
-      if (!state.monster) return state;
-      const result = doSleep(state.monster);
-      if (!result.ok) return { ...state, message: result.message };
-      return { ...state, monster: result.monster, message: result.message };
-    }
+    case "SLEEP":
+      return { ...state, monster: action.monster, message: action.message };
 
-    case "WAKE": {
-      if (!state.monster) return state;
-      const result = doWake(state.monster);
-      if (!result.ok) return { ...state, message: result.message };
-      return { ...state, monster: result.monster, anim: "happy", message: result.message };
-    }
+    case "WAKE":
+      return { ...state, monster: action.monster, anim: "happy", message: action.message };
 
     case "RESET": {
       return { ...state, monster: null, anim: "idle", message: "", showTrain: false };
@@ -440,8 +432,37 @@ export function useGameState() {
   const clean      = useCallback(() => dispatch({ type: "CLEAN" }), []);
   const train      = useCallback((ex: TrainingType) => dispatch({ type: "TRAIN", exercise: ex }), []);
   const toggleTrain = useCallback(() => dispatch({ type: "TOGGLE_TRAIN_MODAL" }), []);
-  const sleep                  = useCallback(() => dispatch({ type: "SLEEP" }), []);
-  const wake                   = useCallback(() => dispatch({ type: "WAKE"  }), []);
+  const sleep = useCallback(async () => {
+    const current = stateRef.current;
+    if (!current.monster) return;
+    const result = doSleep(current.monster);
+    if (!result.ok) { dispatch({ type: "SET_MSG", message: result.message }); return; }
+    dispatch({ type: "SLEEP", monster: result.monster, message: result.message });
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("game_saves").upsert(
+      { user_id: user.id, monster: result.monster, inventory: current.inventory, coins: current.coins },
+      { onConflict: "user_id" }
+    );
+  }, []);
+
+  const wake = useCallback(async () => {
+    const current = stateRef.current;
+    if (!current.monster) return;
+    const result = doWake(current.monster);
+    if (!result.ok) { dispatch({ type: "SET_MSG", message: result.message }); return; }
+    dispatch({ type: "WAKE", monster: result.monster, message: result.message });
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("game_saves").upsert(
+      { user_id: user.id, monster: result.monster, inventory: current.inventory, coins: current.coins },
+      { onConflict: "user_id" }
+    );
+  }, []);
   // Starts an adventure and immediately persists to Supabase (same bypass pattern as spawnMonster).
   // The debounced save gets cancelled on tab close, so without this the adventure state is lost
   // if the user navigates away right after sending their monster out.

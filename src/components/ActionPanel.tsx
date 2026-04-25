@@ -90,7 +90,7 @@ interface Props {
 export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, onTrain, onAdventure, onSleep, onWake, message }: Props) {
   const { care, poops, isDead, lastPetTime, name, isAdventuring, isSick, isInjured, isSleeping } = monster;
 
-  const canClean     = !isDead && poops.length > 0 && !isSleeping;
+  const canClean     = !isDead && poops.length > 0;
   const canTrain     = !isDead && !isSick && !isInjured && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
   const canPetAct    = !isDead && !isAdventuring && !isSleeping;
   const canAdventure = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
