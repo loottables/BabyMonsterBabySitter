@@ -76,15 +76,25 @@ const C_FILL       = "rgb(175,175,175)";
 const C_DETAIL     = "rgb(100,100,100)";
 const C_OUTLINE    = "rgb(40,40,40)";
 
+// 3 discrete positions, 2 passes — ~2/3 the travel distance of the original
+const HAND_POSITIONS = [
+  { left: "50%", top: "25%" },
+  { left: "61%", top: "32%" },
+  { left: "72%", top: "39%" },
+] as const;
+const HAND_STEP_MS   = 300; // ms per position
+const HAND_STEPS     = HAND_POSITIONS.length * 2; // 2 passes
+
 function PetHandOverlay() {
   const canvasRef         = useRef<HTMLCanvasElement>(null);
   const [alive, setAlive] = useState(true);
+  const [step,  setStep]  = useState(0);
 
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
 
-    // Pass 1 — outer outline: for every filled pixel, paint its empty neighbours dark
+    // Pass 1 — outer outline
     ctx.fillStyle = C_OUTLINE;
     for (let row = 0; row < HAND_ROWS.length; row++) {
       for (let col = 0; col < HAND_ROWS[row].length; col++) {
@@ -98,7 +108,7 @@ function PetHandOverlay() {
       }
     }
 
-    // Pass 2 — fill: main colour for "1", detail colour for "3"
+    // Pass 2 — fill
     for (let row = 0; row < HAND_ROWS.length; row++) {
       for (let col = 0; col < HAND_ROWS[row].length; col++) {
         const v = HAND_ROWS[row][col];
@@ -109,40 +119,32 @@ function PetHandOverlay() {
     }
   }, []);
 
+  // Advance one step at a time — no interpolation, pure jump
   useEffect(() => {
-    const t = setTimeout(() => setAlive(false), 2200);
+    if (step >= HAND_STEPS - 1) return;
+    const t = setTimeout(() => setStep(s => s + 1), HAND_STEP_MS);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setAlive(false), HAND_STEP_MS * HAND_STEPS + 200);
     return () => clearTimeout(t);
   }, []);
 
   if (!alive) return null;
 
+  const pos     = HAND_POSITIONS[step % HAND_POSITIONS.length];
   const canvasW = (HAND_W + 2 * HAND_PAD) * HAND_PX; // 70 px
   const canvasH = (HAND_H + 2 * HAND_PAD) * HAND_PX; // 95 px
 
   return (
-    <>
-      <style>{`
-        @keyframes pet-swipe {
-          0%,  32% { left: 50%; top: 25%; }
-          34%, 65% { left: 66%; top: 36%; }
-          67%, 100% { left: 82%; top: 46%; }
-        }
-        .pet-hand {
-          animation-name: pet-swipe;
-          animation-duration: 1000ms;
-          animation-timing-function: linear;
-          animation-iteration-count: 2;
-          animation-fill-mode: forwards;
-        }
-      `}</style>
-      <canvas
-        ref={canvasRef}
-        width={canvasW}
-        height={canvasH}
-        className="pet-hand absolute pointer-events-none select-none"
-        style={{ imageRendering: "pixelated", transform: "translate(-50%, -50%)", zIndex: 10 }}
-      />
-    </>
+    <canvas
+      ref={canvasRef}
+      width={canvasW}
+      height={canvasH}
+      className="absolute pointer-events-none select-none"
+      style={{ imageRendering: "pixelated", transform: "translate(-50%, -50%)", zIndex: 10, left: pos.left, top: pos.top }}
+    />
   );
 }
 
