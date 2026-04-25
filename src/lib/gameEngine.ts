@@ -401,9 +401,11 @@ export function applyItem(monster: Monster, itemId: ItemId): ActionResult {
 
   switch (itemId) {
     case "kibble":
+      if (monster.isSleeping) return { ok: false, message: `${monster.name} is asleep!` };
       return feedMonster(monster);
 
     case "treat": {
+      if (monster.isSleeping) return { ok: false, message: `${monster.name} is asleep!` };
       if (monster.care.happiness >= 98)
         return { ok: false, message: `${monster.name} is already happy!` };
       const maxEnergy = calcMaxEnergy(monster.rpg.end);
