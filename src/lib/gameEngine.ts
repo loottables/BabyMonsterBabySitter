@@ -62,6 +62,13 @@ function randomPoopPos(): Poop {
 
 const LEVEL_STATS = ["str", "atk", "def", "agi", "spd", "end"] as const;
 
+export type LevelStatKey = typeof LEVEL_STATS[number];
+
+export interface LevelUpData {
+  newLevel: number;
+  gains: Partial<Record<LevelStatKey, number>>;
+}
+
 // Randomly spreads `points` across all 6 stats. STR gains also increase maxHp.
 function distributeStatPoints(rpg: RPGStats, points: number, rand = Math.random): RPGStats {
   const r = { ...rpg };
@@ -73,18 +80,33 @@ function distributeStatPoints(rpg: RPGStats, points: number, rand = Math.random)
   return r;
 }
 
+interface LevelResult {
+  rpg:      RPGStats;
+  leveled:  boolean;
+  newLevel: number;
+  gains:    Partial<Record<LevelStatKey, number>>;
+}
+
 // Called by grantExp and trainMonster whenever exp is added.
 // Loops until all accumulated exp is consumed, so multiple level-ups can happen at once.
-function levelUp(rpg: RPGStats): RPGStats {
+function levelUp(rpg: RPGStats): LevelResult {
   let r = { ...rpg };
+  const gains: Partial<Record<LevelStatKey, number>> = {};
+  let leveled = false;
   while (r.exp >= r.expToNext) {
     r.exp      -= r.expToNext;
     r.level    += 1;
     r.expToNext = Math.round(r.expToNext * EXP_SCALE);
+    leveled = true;
+    const before = { ...r };
     r = distributeStatPoints(r, 6);
-    r.hp = r.maxHp; // heal to full on level up
+    r.hp = r.maxHp;
+    for (const stat of LEVEL_STATS) {
+      const diff = r[stat] - before[stat];
+      if (diff > 0) gains[stat] = (gains[stat] ?? 0) + diff;
+    }
   }
-  return r;
+  return { rpg: r, leveled, newLevel: r.level, gains };
 }
 
 // ── creation ───────────────────────────────────────────────────────────────
@@ -164,17 +186,20 @@ export function createMonster(): Monster {
 }
 
 // Adds exp to the monster and triggers level-up(s) if the threshold is crossed.
-// Called by useGameState after adventures (non-battle), battle completions, and training.
-export function grantExp(monster: Monster, exp: number): Monster {
+// Called by useGameState after adventures (non-battle) and battle completions.
+export function grantExp(monster: Monster, exp: number): { monster: Monster; levelUpData: LevelUpData | null } {
   const prevLevel = monster.rpg.level;
-  let rpg = { ...monster.rpg, exp: monster.rpg.exp + exp };
-  rpg = levelUp(rpg);
+  const rpg0 = { ...monster.rpg, exp: monster.rpg.exp + exp };
+  const { rpg, leveled, newLevel, gains } = levelUp(rpg0);
   let care = monster.care;
   if (rpg.level > prevLevel) {
     const maxEnergy = calcMaxEnergy(rpg.end);
     care = { ...care, energy: care.energy < maxEnergy / 2 ? maxEnergy / 2 : maxEnergy };
   }
-  return { ...monster, rpg, care };
+  return {
+    monster: { ...monster, rpg, care },
+    levelUpData: leveled ? { newLevel, gains } : null,
+  };
 }
 
 export function startAdventure(monster: Monster): ActionResult {
@@ -369,9 +394,9 @@ export function applyDecay(monster: Monster, toTime: number, isActive = false): 
 
 // Return type for all player action functions (feed, pet, train, etc.).
 // If ok is true, monster holds the updated state. If ok is false, message explains why it failed.
-// Used by the reducer in useGameState.ts to either apply the new state or show the error message.
+// levelUpData is set when the action triggered a level-up (training only currently).
 export type ActionResult =
-  | { ok: true;  monster: Monster; message: string }
+  | { ok: true;  monster: Monster; message: string; levelUpData?: LevelUpData | null }
   | { ok: false; message: string };
 
 export function feedMonster(monster: Monster): ActionResult {
@@ -523,9 +548,10 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
     }
   }
 
-  const expGained = Math.floor(rpg.expToNext * exercise.expPct);
+  const expGained = Math.ceil(rpg.expToNext * exercise.expPct);
   rpg.exp += expGained;
-  rpg      = levelUp(rpg);
+  const { rpg: leveledRpg, leveled, newLevel: lvl, gains } = levelUp(rpg);
+  rpg = leveledRpg;
 
   const maxEnergy = 5 + Math.floor(rpg.end / 5);
   let newEnergy   = clamp(monster.care.energy - exercise.energyCost, 0, maxEnergy);
@@ -548,6 +574,7 @@ export function trainMonster(monster: Monster, type: TrainingType): ActionResult
     ok: true,
     monster: m,
     message: `${m.name} trained hard! ${exercise.statLabel}`,
+    levelUpData: leveled ? { newLevel: lvl, gains } : null,
   };
 }
 

@@ -8,6 +8,7 @@ import {
   cleanPoop, trainMonster, petMonster, applyDecay, applyItem,
   grantExp, startAdventure as doStartAdventure,
   sleepMonster as doSleep, wakeMonster as doWake,
+  type LevelUpData,
 } from "@/lib/gameEngine";
 import { resolveAdventure, type AdventureResultData } from "@/lib/adventureEngine";
 import type { WildMonster, BattleResult } from "@/lib/battleEngine";
@@ -35,6 +36,7 @@ interface State {
   isLoading:        boolean;
   showTrain:        boolean;
   adventureResult:  AdventureResultData | null;
+  levelUpData:      LevelUpData | null;
   // pendingEncounter: the "fight or flee" decision screen (WildBattleEncounter.tsx)
   pendingEncounter: PendingEncounter | null;
   // activeBattle: the actual animated battle in progress (BattleView.tsx);
@@ -58,6 +60,7 @@ type Action =
   | { type: "TOGGLE_TRAIN_MODAL" }
   | { type: "START_ADVENTURE"; monster: Monster; message: string }
   | { type: "DISMISS_ADVENTURE_RESULT" }
+  | { type: "DISMISS_LEVEL_UP" }
   | { type: "RUN_FROM_BATTLE" }
   | { type: "ACCEPT_BATTLE";    useFirstAidKit: boolean }
   | { type: "COMPLETE_BATTLE" }
@@ -93,7 +96,7 @@ function applyAdventureResult(state: State, monster: Monster): State {
     };
   }
 
-  let rewarded = grantExp(m, outcome.expGained);
+  const { monster: rewarded, levelUpData } = grantExp(m, outcome.expGained);
   let inv = state.inventory;
   let itemObtained = false;
   if (outcome.itemFound) {
@@ -102,7 +105,7 @@ function applyAdventureResult(state: State, monster: Monster): State {
   }
 
   const result: AdventureResultData = { ...outcome, itemObtained };
-  return { ...state, monster: rewarded, inventory: inv, coins: state.coins + outcome.coinsFound, adventureResult: result, anim: "happy" };
+  return { ...state, monster: rewarded, inventory: inv, coins: state.coins + outcome.coinsFound, adventureResult: result, levelUpData: levelUpData ?? state.levelUpData, anim: "happy" };
 }
 
 // ── reducer ────────────────────────────────────────────────────────────────
@@ -206,7 +209,7 @@ function reducer(state: State, action: Action): State {
       if (!state.monster) return state;
       const result = trainMonster(state.monster, action.exercise);
       if (!result.ok) return { ...state, message: result.message, showTrain: false };
-      return { ...state, monster: result.monster, anim: "training", message: result.message, showTrain: false };
+      return { ...state, monster: result.monster, anim: "training", message: result.message, showTrain: false, levelUpData: result.levelUpData ?? state.levelUpData };
     }
 
     case "TOGGLE_TRAIN_MODAL":
@@ -217,6 +220,9 @@ function reducer(state: State, action: Action): State {
 
     case "DISMISS_ADVENTURE_RESULT":
       return { ...state, adventureResult: null };
+
+    case "DISMISS_LEVEL_UP":
+      return { ...state, levelUpData: null };
 
     case "RUN_FROM_BATTLE":
       return { ...state, pendingEncounter: null, message: "You ran away safely." };
@@ -244,8 +250,11 @@ function reducer(state: State, action: Action): State {
       if (!state.activeBattle || !state.monster) return state;
       const { battleResult } = state.activeBattle;
       let m = { ...state.monster, rpg: { ...state.monster.rpg, hp: battleResult.finalPlayerHp } };
+      let levelUpData = state.levelUpData;
       if (battleResult.winner === "player") {
-        m = grantExp(m, battleResult.expGained);
+        const granted = grantExp(m, battleResult.expGained);
+        m = granted.monster;
+        levelUpData = granted.levelUpData ?? levelUpData;
       } else {
         m = { ...m, rpg: { ...m.rpg, hp: 1 }, isInjured: true };
       }
@@ -254,6 +263,7 @@ function reducer(state: State, action: Action): State {
         monster:      m,
         coins:        state.coins + (battleResult.winner === "player" ? battleResult.coinsGained : 0),
         activeBattle: null,
+        levelUpData,
       };
     }
 
@@ -300,6 +310,7 @@ const INITIAL: State = {
   isLoading:        true,
   showTrain:        false,
   adventureResult:  null,
+  levelUpData:      null,
   pendingEncounter: null,
   activeBattle:     null,
 };
@@ -485,6 +496,7 @@ export function useGameState() {
     );
   }, []);
   const dismissAdventureResult = useCallback(() => dispatch({ type: "DISMISS_ADVENTURE_RESULT" }), []);
+  const dismissLevelUp         = useCallback(() => dispatch({ type: "DISMISS_LEVEL_UP" }),         []);
   const runFromBattle          = useCallback(() => dispatch({ type: "RUN_FROM_BATTLE" }), []);
   const acceptBattle           = useCallback((useFirstAidKit: boolean) => dispatch({ type: "ACCEPT_BATTLE", useFirstAidKit }), []);
   const completeBattle         = useCallback(() => dispatch({ type: "COMPLETE_BATTLE" }), []);
@@ -500,6 +512,7 @@ export function useGameState() {
     isLoading:       state.isLoading,
     showTrain:       state.showTrain,
     adventureResult: state.adventureResult,
+    levelUpData:     state.levelUpData,
     spawnMonster,
     useItem,
     deleteItem,
@@ -514,6 +527,7 @@ export function useGameState() {
     wake,
     adventure,
     dismissAdventureResult,
+    dismissLevelUp,
     runFromBattle,
     acceptBattle,
     completeBattle,

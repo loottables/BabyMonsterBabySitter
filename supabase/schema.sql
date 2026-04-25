@@ -1,14 +1,18 @@
 -- ── Profiles ──────────────────────────────────────────────────────────────
 create table if not exists profiles (
   id          uuid primary key references auth.users on delete cascade,
-  username    text,
+  username    text unique,
   created_at  timestamptz default now()
 );
 
 alter table profiles enable row level security;
 
-create policy "Users can read their own profile"
-  on profiles for select using (auth.uid() = id);
+-- Usernames are public — needed so uniqueness checks work across all accounts
+create policy "Anyone can read profiles"
+  on profiles for select using (true);
+
+create policy "Users can insert their own profile"
+  on profiles for insert with check (auth.uid() = id);
 
 create policy "Users can update their own profile"
   on profiles for update using (auth.uid() = id);

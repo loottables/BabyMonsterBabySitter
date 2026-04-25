@@ -10,6 +10,7 @@ import SettingsPanel from "./SettingsPanel";
 import TrainingModal from "./TrainingModal";
 import DeathScreen from "./DeathScreen";
 import AdventureResultModal from "./AdventureResultModal";
+import LevelUpModal from "./LevelUpModal";
 import WildBattleEncounter from "./WildBattleEncounter";
 import BattleView from "./BattleView";
 import { useGameState } from "@/hooks/useGameState";
@@ -186,9 +187,9 @@ function AdventureOverlay({ adventureStart, adventureDuration }: { adventureStar
 export default function GameUI() {
   const {
     monster, inventory, coins, anim, message, isLoading, showTrain,
-    adventureResult, pendingEncounter, activeBattle,
+    adventureResult, levelUpData, pendingEncounter, activeBattle,
     spawnMonster, useItem, deleteItem, buyItem, sellItem, pet, clean, train, toggleTrain,
-    sleep, wake, adventure, dismissAdventureResult, runFromBattle, acceptBattle, completeBattle,
+    sleep, wake, adventure, dismissAdventureResult, dismissLevelUp, runFromBattle, acceptBattle, completeBattle,
     rename, wipeAll,
   } = useGameState();
   const [showBag,      setShowBag]      = useState(false);
@@ -198,6 +199,16 @@ export default function GameUI() {
   const [nameInput,    setNameInput]    = useState("");
   const [nameError,    setNameError]    = useState("");
   const [petKey,       setPetKey]       = useState(0);
+  const [username,     setUsername]     = useState("");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase.from("profiles").select("username").eq("id", user.id).single()
+        .then(({ data }) => { if (data?.username) setUsername(data.username); });
+    });
+  }, []);
 
   function handlePet() { pet(); setPetKey(k => k + 1); }
 
@@ -329,6 +340,11 @@ export default function GameUI() {
       {/* Header */}
       <div className="grid grid-cols-3 items-center">
         <div className="flex flex-col gap-1">
+          {username && (
+            <p style={{ fontSize: "20px" }} className="text-monster-text uppercase tracking-wide leading-none">
+              {username}
+            </p>
+          )}
           {renaming ? (
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -457,6 +473,10 @@ export default function GameUI() {
 
       {adventureResult && (
         <AdventureResultModal result={adventureResult} onClose={dismissAdventureResult} />
+      )}
+
+      {levelUpData && (
+        <LevelUpModal data={levelUpData} onClose={dismissLevelUp} />
       )}
 
       {pendingEncounter && (

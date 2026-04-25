@@ -58,7 +58,7 @@ const STAT_DETAILS: Record<string, { title: string; body: string }> = {
   },
   EXP: {
     title: "EXP — Experience",
-    body:  "Earned by training. Fill the bar to level up. On level-up, one random battle stat (ATK, DEF, AGI, or SPD) gains +1.",
+    body:  "Earned by training (not Endurance Run). Fill the bar to level up. On level-up, 6 points are randomly spread across all stats (STR, ATK, DEF, AGI, SPD, END) and your monster heals to full HP.",
   },
 };
 
