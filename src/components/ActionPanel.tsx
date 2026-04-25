@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Monster } from "@/types/game";
 import { PET_COOLDOWN_MS } from "@/lib/constants";
 
@@ -30,6 +31,49 @@ function ActionBtn({ label, onClick, disabled, title }: BtnProps) {
   );
 }
 
+interface PetBtnProps {
+  lastPetTime: number | null;
+  onPet:       () => void;
+  canAct:      boolean; // false when dead / sleeping / adventuring
+  name:        string;
+}
+
+function PetBtn({ lastPetTime, onPet, canAct, name }: PetBtnProps) {
+  const [msLeft, setMsLeft] = useState(() =>
+    lastPetTime ? Math.max(0, PET_COOLDOWN_MS - (Date.now() - lastPetTime)) : 0
+  );
+
+  useEffect(() => {
+    if (!lastPetTime) { setMsLeft(0); return; }
+    const tick = () => setMsLeft(Math.max(0, PET_COOLDOWN_MS - (Date.now() - lastPetTime)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lastPetTime]);
+
+  const onCooldown = msLeft > 0;
+  const secsLeft   = Math.ceil(msLeft / 1000);
+  const timeStr    = `${Math.floor(secsLeft / 60)}:${String(secsLeft % 60).padStart(2, "0")}`;
+
+  return (
+    <button
+      onClick={onPet}
+      disabled={!canAct || onCooldown}
+      title={onCooldown ? `You recently petted ${name}` : "Pet your monster"}
+      style={{ fontSize: "8px" }}
+      className={`
+        px-4 py-3 border uppercase tracking-widest
+        border-monster-border bg-monster-panel text-monster-text
+        hover:bg-monster-border disabled:cursor-not-allowed
+        active:scale-95 select-none transition-all duration-100
+        ${onCooldown ? "opacity-50" : !canAct ? "opacity-30" : ""}
+      `}
+    >
+      {onCooldown ? timeStr : "Pet"}
+    </button>
+  );
+}
+
 interface Props {
   monster:     Monster;
   onBag:       () => void;
@@ -46,12 +90,10 @@ interface Props {
 export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, onTrain, onAdventure, onSleep, onWake, message }: Props) {
   const { care, poops, isDead, lastPetTime, name, isAdventuring, isSick, isInjured, isSleeping } = monster;
 
-  const now           = Date.now();
-  const canClean      = !isDead && poops.length > 0 && !isSleeping;
-  const canTrain      = !isDead && !isSick && !isInjured && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
-  const petOnCooldown = lastPetTime !== null && now - lastPetTime < PET_COOLDOWN_MS;
-  const canPet        = !isDead && !petOnCooldown && !isAdventuring && !isSleeping;
-  const canAdventure  = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
+  const canClean     = !isDead && poops.length > 0 && !isSleeping;
+  const canTrain     = !isDead && !isSick && !isInjured && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
+  const canPetAct    = !isDead && !isAdventuring && !isSleeping;
+  const canAdventure = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
   const canSleep      = !isDead && !isAdventuring && !isSleeping;
   const canWake       = !isDead && isSleeping;
 
@@ -81,12 +123,7 @@ export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, on
       <div className="flex justify-center gap-3 flex-wrap">
         <ActionBtn label="Bag"   onClick={onBag}   title="Open bag" />
         <ActionBtn label="Shop"  onClick={onShop}  title="Visit the shop" />
-        <ActionBtn
-          label="Pet"
-          onClick={onPet}
-          disabled={!canPet}
-          title={petOnCooldown ? `You recently petted ${name}` : "Pet your monster"}
-        />
+        <PetBtn lastPetTime={lastPetTime} onPet={onPet} canAct={canPetAct} name={name} />
         <ActionBtn
           label={`Clean${poops.length > 0 ? ` (${poops.length})` : ""}`}
           onClick={onClean}

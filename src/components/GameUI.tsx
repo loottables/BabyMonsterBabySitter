@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import StatsPanel from "./StatsPanel";
 import ActionPanel from "./ActionPanel";
@@ -41,6 +41,102 @@ function EggCountdown({ hatchTime }: { hatchTime: number }) {
     <span style={{ fontSize: "14px" }} className="text-monster-text tabular-nums">
       {mins}:{secs.toString().padStart(2, "0")}
     </span>
+  );
+}
+
+// Pixel-art hand sprite — upright, palm facing viewer, thumb on right.
+// "0" = transparent  "1" = main fill  "3" = darker detail (knuckles / crease)
+const HAND_ROWS = [
+  "110110110110",  // fingertips (pinky · ring · middle · index, 2 px each)
+  "110110110110",
+  "130130130130",  // knuckle row — inner pixel of each finger darkened
+  "111111111110",  // fingers merge into upper palm
+  "111111111110",
+  "111111111130",  // thumb / index separation crease at col 10
+  "111111111111",  // thumb appears (col 11)
+  "111111111111",
+  "011111111110",  // upper palm
+  "011133111110",  // palm crease line (cols 3–4)
+  "001111111100",  // lower palm
+  "001111111100",
+  "000111111000",  // wrist
+  "000111111000",
+];
+const HAND_PX      = 6;   // CSS px per grid pixel
+const HAND_W       = 12;  // grid columns
+const HAND_H       = 14;  // grid rows
+const HAND_PAD     = 1;   // 1 grid pixel of padding so the outer outline has room
+const C_FILL       = "rgb(175,175,175)";
+const C_DETAIL     = "rgb(100,100,100)";
+const C_OUTLINE    = "rgb(40,40,40)";
+
+function PetHandOverlay() {
+  const canvasRef         = useRef<HTMLCanvasElement>(null);
+  const [alive, setAlive] = useState(true);
+
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+
+    // Pass 1 — outer outline: for every filled pixel, paint its empty neighbours dark
+    ctx.fillStyle = C_OUTLINE;
+    for (let row = 0; row < HAND_ROWS.length; row++) {
+      for (let col = 0; col < HAND_ROWS[row].length; col++) {
+        if (HAND_ROWS[row][col] === "0") continue;
+        for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]] as const) {
+          const nr = row + dr, nc = col + dc;
+          if ((HAND_ROWS[nr]?.[nc] ?? "0") === "0") {
+            ctx.fillRect((nc + HAND_PAD) * HAND_PX, (nr + HAND_PAD) * HAND_PX, HAND_PX, HAND_PX);
+          }
+        }
+      }
+    }
+
+    // Pass 2 — fill: main colour for "1", detail colour for "3"
+    for (let row = 0; row < HAND_ROWS.length; row++) {
+      for (let col = 0; col < HAND_ROWS[row].length; col++) {
+        const v = HAND_ROWS[row][col];
+        if (v === "0") continue;
+        ctx.fillStyle = v === "3" ? C_DETAIL : C_FILL;
+        ctx.fillRect((col + HAND_PAD) * HAND_PX, (row + HAND_PAD) * HAND_PX, HAND_PX, HAND_PX);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setAlive(false), 2200);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!alive) return null;
+
+  const canvasW = (HAND_W + 2 * HAND_PAD) * HAND_PX; // 84 px
+  const canvasH = (HAND_H + 2 * HAND_PAD) * HAND_PX; // 96 px
+
+  return (
+    <>
+      <style>{`
+        @keyframes pet-swipe {
+          0%,  32% { left: 50%; top: 25%; }
+          34%, 65% { left: 66%; top: 36%; }
+          67%, 100% { left: 82%; top: 46%; }
+        }
+        .pet-hand {
+          animation-name: pet-swipe;
+          animation-duration: 1000ms;
+          animation-timing-function: linear;
+          animation-iteration-count: 2;
+          animation-fill-mode: forwards;
+        }
+      `}</style>
+      <canvas
+        ref={canvasRef}
+        width={canvasW}
+        height={canvasH}
+        className="pet-hand absolute pointer-events-none select-none"
+        style={{ imageRendering: "pixelated", transform: "translate(-50%, -50%)", zIndex: 10 }}
+      />
+    </>
   );
 }
 
@@ -101,6 +197,9 @@ export default function GameUI() {
   const [renaming,     setRenaming]     = useState(false);
   const [nameInput,    setNameInput]    = useState("");
   const [nameError,    setNameError]    = useState("");
+  const [petKey,       setPetKey]       = useState(0);
+
+  function handlePet() { pet(); setPetKey(k => k + 1); }
 
   async function handleSignOut() {
     await createClient().auth.signOut();
@@ -278,7 +377,7 @@ export default function GameUI() {
         </div>
 
         <div className="flex flex-col items-center gap-3 shrink-0">
-          <div className="relative">
+          <div className="relative overflow-hidden">
             <MonsterCanvas monster={monster} anim={anim} />
 
             {/* Level + status overlay — top of the canvas window */}
@@ -297,6 +396,7 @@ export default function GameUI() {
               )}
             </div>
 
+            {petKey > 0 && <PetHandOverlay key={petKey} />}
             {monster.isSleeping && <SleepOverlay />}
             {monster.isAdventuring && monster.adventureStart !== null && (
               <AdventureOverlay adventureStart={monster.adventureStart} adventureDuration={monster.adventureDuration} />
@@ -316,7 +416,7 @@ export default function GameUI() {
         monster={monster}
         onBag={() => setShowBag(true)}
         onShop={() => setShowShop(true)}
-        onPet={pet}
+        onPet={handlePet}
         onClean={clean}
         onTrain={toggleTrain}
         onSleep={sleep}
