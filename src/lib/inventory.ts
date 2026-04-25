@@ -1,5 +1,10 @@
 import type { Inventory, ItemId } from "@/types/items";
 
+function compact(inv: Inventory): Inventory {
+  const filled = inv.filter(s => s !== null);
+  return [...filled, ...Array(inv.length - filled.length).fill(null)] as Inventory;
+}
+
 // New players start with 20 kibble in slot 0; remaining slots empty
 export function createDefaultInventory(): Inventory {
   const inv: Inventory = Array(9).fill(null);
@@ -16,7 +21,7 @@ export function consumeSlot(
   if (!slot) return null;
   const next = [...inv];
   next[index] = slot.quantity <= 1 ? null : { ...slot, quantity: slot.quantity - 1 };
-  return { inv: next, itemId: slot.itemId };
+  return { inv: compact(next), itemId: slot.itemId };
 }
 
 // Stacks onto an existing slot of the same item, or occupies an empty slot.
@@ -38,5 +43,5 @@ export function addToInventory(inv: Inventory, itemId: ItemId): Inventory | null
 export function deleteSlot(inv: Inventory, index: number): Inventory {
   const next = [...inv];
   next[index] = null;
-  return next;
+  return compact(next);
 }
