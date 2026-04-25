@@ -189,6 +189,8 @@ export function wildToDisplayMonster(wild: WildMonster): Monster {
     isAdventuring:         false,
     adventureStart:        null,
     adventureDuration:     null,
+    isAtSpa:               false,
+    spaStart:              null,
     isInjured:             false,
     injuredHealStart:      null,
     isSleeping:            false,

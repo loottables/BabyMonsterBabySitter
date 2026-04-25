@@ -11,11 +11,12 @@ import TrainingModal from "./TrainingModal";
 import DeathScreen from "./DeathScreen";
 import AdventureResultModal from "./AdventureResultModal";
 import LevelUpModal from "./LevelUpModal";
+import SpaPanel from "./SpaPanel";
 import WildBattleEncounter from "./WildBattleEncounter";
 import BattleView from "./BattleView";
 import { useGameState } from "@/hooks/useGameState";
 import { checkName } from "@/lib/nameFilter";
-import { ADVENTURE_DURATION_MS } from "@/lib/constants";
+import { ADVENTURE_DURATION_MS, SPA_DURATION_MS } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 
 const MonsterCanvas = dynamic(() => import("./MonsterCanvas"), { ssr: false });
@@ -163,6 +164,34 @@ function SleepOverlay() {
   );
 }
 
+function SpaOverlay({ spaStart }: { spaStart: number }) {
+  const end = spaStart + SPA_DURATION_MS;
+  const [msLeft, setMsLeft] = useState(() => Math.max(0, end - Date.now()));
+
+  useEffect(() => {
+    const id = setInterval(() => setMsLeft(Math.max(0, end - Date.now())), 500);
+    return () => clearInterval(id);
+  }, [end]);
+
+  const totalSec = Math.ceil(msLeft / 1000);
+  const mins     = Math.floor(totalSec / 60);
+  const secs     = totalSec % 60;
+
+  return (
+    <div
+      className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+      style={{ backgroundColor: "rgba(0,0,0,0.65)" }}
+    >
+      <span style={{ fontSize: "8px" }} className="text-monster-text uppercase tracking-widest animate-pulse">
+        Visiting the Spa...
+      </span>
+      <span style={{ fontSize: "11px" }} className="text-monster-text tabular-nums">
+        {mins}:{secs.toString().padStart(2, "0")}
+      </span>
+    </div>
+  );
+}
+
 function AdventureOverlay({ adventureStart, adventureDuration }: { adventureStart: number; adventureDuration: number | null }) {
   const end = adventureStart + (adventureDuration ?? ADVENTURE_DURATION_MS);
   const [msLeft, setMsLeft] = useState(() => Math.max(0, end - Date.now()));
@@ -193,11 +222,11 @@ function AdventureOverlay({ adventureStart, adventureDuration }: { adventureStar
 
 export default function GameUI() {
   const {
-    monster, inventory, coins, anim, message, isLoading, showTrain,
+    monster, inventory, coins, anim, message, isLoading, showTrain, showSpa,
     adventureResult, levelUpData, pendingEncounter, activeBattle,
     spawnMonster, useItem, deleteItem, buyItem, sellItem, pet, clean, train, toggleTrain,
     sleep, wake, adventure, dismissAdventureResult, dismissLevelUp, runFromBattle, acceptBattle, completeBattle,
-    rename, wipeAll,
+    rename, wipeAll, toggleSpa, visitSpa,
   } = useGameState();
   const [showBag,      setShowBag]      = useState(false);
   const [showShop,     setShowShop]     = useState(false);
@@ -421,6 +450,9 @@ export default function GameUI() {
 
             {petKey > 0 && <PetHandOverlay key={petKey} />}
             {monster.isSleeping && <SleepOverlay />}
+            {monster.isAtSpa && monster.spaStart !== null && (
+              <SpaOverlay spaStart={monster.spaStart} />
+            )}
             {monster.isAdventuring && monster.adventureStart !== null && (
               <AdventureOverlay adventureStart={monster.adventureStart} adventureDuration={monster.adventureDuration} />
             )}
@@ -439,6 +471,7 @@ export default function GameUI() {
         monster={monster}
         onBag={() => setShowBag(true)}
         onShop={() => setShowShop(true)}
+        onSpa={toggleSpa}
         onPet={handlePet}
         onClean={clean}
         onTrain={toggleTrain}
@@ -475,6 +508,15 @@ export default function GameUI() {
           onUse={useItem}
           onDelete={deleteItem}
           onClose={() => setShowBag(false)}
+        />
+      )}
+
+      {showSpa && (
+        <SpaPanel
+          coins={coins}
+          monster={monster}
+          onEnter={visitSpa}
+          onClose={toggleSpa}
         />
       )}
 

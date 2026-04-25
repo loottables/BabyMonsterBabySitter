@@ -78,6 +78,7 @@ interface Props {
   monster:     Monster;
   onBag:       () => void;
   onShop:      () => void;
+  onSpa:       () => void;
   onPet:       () => void;
   onClean:     () => void;
   onTrain:     () => void;
@@ -87,15 +88,16 @@ interface Props {
   message:     string;
 }
 
-export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, onTrain, onAdventure, onSleep, onWake, message }: Props) {
-  const { care, poops, isDead, lastPetTime, name, isAdventuring, isSick, isInjured, isSleeping } = monster;
+export default function ActionPanel({ monster, onBag, onShop, onSpa, onPet, onClean, onTrain, onAdventure, onSleep, onWake, message }: Props) {
+  const { care, poops, isDead, lastPetTime, name, isAdventuring, isAtSpa, isSick, isInjured, isSleeping } = monster;
 
   const canClean     = !isDead && poops.length > 0;
-  const canTrain     = !isDead && !isSick && !isInjured && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
-  const canPetAct    = !isDead && !isAdventuring && !isSleeping;
-  const canAdventure = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring && !isSleeping;
-  const canSleep      = !isDead && !isAdventuring && !isSleeping;
-  const canWake       = !isDead && isSleeping;
+  const canTrain     = !isDead && !isSick && !isInjured && Math.round(care.energy) >= 1 && !isAdventuring && !isAtSpa && !isSleeping;
+  const canPetAct    = !isDead && !isAdventuring && !isAtSpa && !isSleeping;
+  const canAdventure = !isDead && !isSick && Math.round(care.energy) >= 1 && !isAdventuring && !isAtSpa && !isSleeping;
+  const canSpa       = !isDead && !isAdventuring && !isAtSpa && !isSleeping;
+  const canSleep     = !isDead && !isAdventuring && !isAtSpa && !isSleeping;
+  const canWake      = !isDead && isSleeping;
 
   const trainTitle = isSick       ? `${name} is too sick to train`
                    : isInjured    ? `${name} is injured — use a First Aid Kit first`
@@ -123,6 +125,12 @@ export default function ActionPanel({ monster, onBag, onShop, onPet, onClean, on
       <div className="flex justify-center gap-3 flex-wrap">
         <ActionBtn label="Bag"   onClick={onBag}   title="Open bag" />
         <ActionBtn label="Shop"  onClick={onShop}  title="Visit the shop" />
+        <ActionBtn
+          label={isAtSpa ? "At Spa..." : "Spa"}
+          onClick={onSpa}
+          disabled={!canSpa}
+          title={isAtSpa ? `${name} is at the spa` : canSpa ? "Visit the spa (100 coins)" : "Can't visit the spa right now"}
+        />
         <PetBtn lastPetTime={lastPetTime} onPet={onPet} canAct={canPetAct} name={name} />
         <ActionBtn
           label={`Clean${poops.length > 0 ? ` (${poops.length})` : ""}`}

@@ -43,6 +43,10 @@ export const INJURED_HAPPINESS_DRAIN_PER_MIN = 1.5;  // extra happiness drain wh
 
 // ── Actions ────────────────────────────────────────────────────────────────
 export const ADVENTURE_DURATION_MS  = 15 * 1000;  // fallback for saves without adventureDuration
+export const SPA_COST               = 100;
+export const SPA_DURATION_MS        = 60 * 1000;  // 1 real minute
+export const SPA_HAPPINESS_GAIN     = 20;
+export const SPA_ENERGY_GAIN        = 1;
 export const AUTOSLEEP_INACTIVE_MS  = 15 * 60 * 1000; // 15 min of inactivity → real-time auto-sleep
 export const AUTOSLEEP_HOUR         = 20;              // 8 PM local time — monsters auto-sleep
 export const AUTOSLEEP_WAKE_HOUR    = 8;               // 8 AM local time — monsters auto-wake

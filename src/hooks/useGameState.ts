@@ -8,6 +8,7 @@ import {
   cleanPoop, trainMonster, petMonster, applyDecay, applyItem,
   grantExp, startAdventure as doStartAdventure,
   sleepMonster as doSleep, wakeMonster as doWake,
+  enterSpa as doEnterSpa, completeSpa,
   type LevelUpData,
 } from "@/lib/gameEngine";
 import { resolveAdventure, type AdventureResultData } from "@/lib/adventureEngine";
@@ -16,7 +17,7 @@ import {
   consumeSlot, deleteSlot, createDefaultInventory, addToInventory,
 } from "@/lib/inventory";
 import { ITEM_DEFS } from "@/types/items";
-import { STARTING_COINS, ADVENTURE_DURATION_MS, AUTOSLEEP_INACTIVE_MS, AUTOSLEEP_HOUR } from "@/lib/constants";
+import { STARTING_COINS, ADVENTURE_DURATION_MS, AUTOSLEEP_INACTIVE_MS, AUTOSLEEP_HOUR, SPA_COST, SPA_DURATION_MS } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 
 // ── state ──────────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ interface State {
   message:          string;
   isLoading:        boolean;
   showTrain:        boolean;
+  showSpa:          boolean;
   adventureResult:  AdventureResultData | null;
   levelUpData:      LevelUpData | null;
   // pendingEncounter: the "fight or flee" decision screen (WildBattleEncounter.tsx)
@@ -58,6 +60,8 @@ type Action =
   | { type: "CLEAN" }
   | { type: "TRAIN";                  exercise: TrainingType }
   | { type: "TOGGLE_TRAIN_MODAL" }
+  | { type: "TOGGLE_SPA_PANEL" }
+  | { type: "ENTER_SPA";  monster: Monster }
   | { type: "START_ADVENTURE"; monster: Monster; message: string }
   | { type: "DISMISS_ADVENTURE_RESULT" }
   | { type: "DISMISS_LEVEL_UP" }
@@ -113,12 +117,17 @@ function applyAdventureResult(state: State, monster: Monster): State {
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "LOAD": {
-      const m = action.monster;
+      let m = action.monster;
       let s: State = { ...state, monster: m, inventory: action.inventory, coins: action.coins, pendingEncounter: action.pendingEncounter, isLoading: false };
-      if (m && m.isAdventuring && m.adventureStart !== null) {
-        const dur = m.adventureDuration ?? ADVENTURE_DURATION_MS;
-        if (Date.now() - m.adventureStart >= dur) {
-          s = applyAdventureResult({ ...s, monster: m }, m);
+      if (m) {
+        if (m.isAdventuring && m.adventureStart !== null) {
+          const dur = m.adventureDuration ?? ADVENTURE_DURATION_MS;
+          if (Date.now() - m.adventureStart >= dur) s = applyAdventureResult({ ...s, monster: m }, m);
+        }
+        m = s.monster!;
+        if (m.isAtSpa && m.spaStart !== null && Date.now() - m.spaStart >= SPA_DURATION_MS) {
+          const done = completeSpa(m);
+          s = { ...s, monster: done, anim: "happy", message: `${done.name} feels refreshed!` };
         }
       }
       return s;
@@ -132,7 +141,7 @@ function reducer(state: State, action: Action): State {
       let m = applyDecay(state.monster, Date.now(), action.isActive);
 
       // Auto-sleep: player inactive 15+ min and local time is 8 PM or later
-      if (action.autoSleep && !m.isSleeping && !m.isAdventuring && m.isHatched && !m.isDead) {
+      if (action.autoSleep && !m.isSleeping && !m.isAdventuring && !m.isAtSpa && m.isHatched && !m.isDead) {
         m = { ...m, isSleeping: true };
       }
 
@@ -142,6 +151,12 @@ function reducer(state: State, action: Action): State {
         if (Date.now() - m.adventureStart >= dur) {
           return applyAdventureResult(state, m);
         }
+      }
+
+      // Spa completion check
+      if (m.isAtSpa && m.spaStart !== null && Date.now() - m.spaStart >= SPA_DURATION_MS) {
+        const done = completeSpa(m);
+        return { ...state, monster: done, anim: "happy", message: `${done.name} feels refreshed!` };
       }
 
       return { ...state, monster: m, anim: m.isDead ? "dead" : state.anim };
@@ -214,6 +229,12 @@ function reducer(state: State, action: Action): State {
 
     case "TOGGLE_TRAIN_MODAL":
       return { ...state, showTrain: !state.showTrain };
+
+    case "TOGGLE_SPA_PANEL":
+      return { ...state, showSpa: !state.showSpa };
+
+    case "ENTER_SPA":
+      return { ...state, monster: action.monster, coins: state.coins - SPA_COST, showSpa: false, message: action.monster.name + " heads to the spa!" };
 
     case "START_ADVENTURE":
       return { ...state, monster: action.monster, message: action.message };
@@ -309,6 +330,7 @@ const INITIAL: State = {
   message:          "",
   isLoading:        true,
   showTrain:        false,
+  showSpa:          false,
   adventureResult:  null,
   levelUpData:      null,
   pendingEncounter: null,
@@ -496,6 +518,24 @@ export function useGameState() {
       { onConflict: "user_id" }
     );
   }, []);
+  const toggleSpa = useCallback(() => dispatch({ type: "TOGGLE_SPA_PANEL" }), []);
+  const visitSpa  = useCallback(async () => {
+    const current = stateRef.current;
+    if (!current.monster) return;
+    if (current.coins < SPA_COST) { dispatch({ type: "SET_MSG", message: "Not enough coins!" }); return; }
+    const result = doEnterSpa(current.monster);
+    if (!result.ok) { dispatch({ type: "SET_MSG", message: result.message }); return; }
+    dispatch({ type: "ENTER_SPA", monster: result.monster });
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("game_saves").upsert(
+      { user_id: user.id, monster: result.monster, inventory: current.inventory, coins: current.coins - SPA_COST, pending_encounter: current.pendingEncounter },
+      { onConflict: "user_id" }
+    );
+  }, []);
+
   const dismissAdventureResult = useCallback(() => dispatch({ type: "DISMISS_ADVENTURE_RESULT" }), []);
   const dismissLevelUp         = useCallback(() => dispatch({ type: "DISMISS_LEVEL_UP" }),         []);
   const runFromBattle          = useCallback(() => dispatch({ type: "RUN_FROM_BATTLE" }), []);
@@ -536,5 +576,8 @@ export function useGameState() {
     wipeAll,
     pendingEncounter: state.pendingEncounter,
     activeBattle:     state.activeBattle,
+    showSpa:          state.showSpa,
+    toggleSpa,
+    visitSpa,
   };
 }

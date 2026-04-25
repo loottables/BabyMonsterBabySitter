@@ -68,6 +68,9 @@ export interface Monster {
   adventureStart: number | null;      // unix ms when the adventure began; also used as the RNG seed for outcome
   adventureDuration: number | null;   // randomized ms duration set when starting the adventure (5–25 seconds)
 
+  isAtSpa:  boolean;
+  spaStart: number | null;  // unix ms when the spa visit began
+
   isSleeping: boolean;    // while sleeping: happiness/cleanliness don't decay, digestion is paused
 
   isInjured: boolean;

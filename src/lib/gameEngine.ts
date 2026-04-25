@@ -35,6 +35,8 @@ import {
   INJURY_HEAL_MS,
   AUTOSLEEP_HOUR,
   AUTOSLEEP_WAKE_HOUR,
+  SPA_HAPPINESS_GAIN,
+  SPA_ENERGY_GAIN,
 } from "./constants";
 
 // Max energy a monster can hold: base 5 + 1 per 5 END points.
@@ -181,6 +183,8 @@ export function createMonster(): Monster {
     isAdventuring:     false,
     adventureStart:    null,
     adventureDuration: null,
+    isAtSpa:          false,
+    spaStart:         null,
     isInjured:        false,
     injuredHealStart: null,
     isSleeping:       false,
@@ -219,6 +223,31 @@ export function startAdventure(monster: Monster): ActionResult {
     care: { ...monster.care, energy: clamp(monster.care.energy - 1) },
   };
   return { ok: true, monster: m, message: `${m.name} sets out on an adventure!` };
+}
+
+export function enterSpa(monster: Monster): ActionResult {
+  if (!monster.isHatched)    return { ok: false, message: "The egg hasn't hatched yet!" };
+  if (monster.isDead)        return { ok: false, message: "Monster is dead." };
+  if (monster.isAdventuring) return { ok: false, message: `${monster.name} is away adventuring!` };
+  if (monster.isSleeping)    return { ok: false, message: `${monster.name} is sleeping.` };
+  if (monster.isAtSpa)       return { ok: false, message: `${monster.name} is already at the spa.` };
+  return { ok: true, monster: { ...monster, isAtSpa: true, spaStart: now() }, message: `${monster.name} heads to the spa!` };
+}
+
+export function completeSpa(monster: Monster): Monster {
+  const maxEnergy = calcMaxEnergy(monster.rpg.end);
+  return {
+    ...monster,
+    isAtSpa:  false,
+    spaStart: null,
+    care: {
+      ...monster.care,
+      cleanliness: 100,
+      happiness:   clamp(monster.care.happiness + SPA_HAPPINESS_GAIN),
+      energy:      clamp(monster.care.energy    + SPA_ENERGY_GAIN, 0, maxEnergy),
+    },
+    rpg: { ...monster.rpg, hp: monster.rpg.maxHp },
+  };
 }
 
 export function sleepMonster(monster: Monster): ActionResult {
@@ -409,7 +438,7 @@ function offlineSleepStart(ts: number): number {
 // The monster stays sleeping until the player manually wakes it — there is no auto-wake.
 // Manually-sleeping or adventuring monsters decay straight through without splitting.
 export function applyOfflineDecay(monster: Monster, toTime: number): Monster {
-  if (monster.isSleeping || monster.isAdventuring || monster.isDead || !monster.isHatched) {
+  if (monster.isSleeping || monster.isAdventuring || monster.isAtSpa || monster.isDead || !monster.isHatched) {
     return applyDecay(monster, toTime, false);
   }
 
@@ -640,6 +669,8 @@ export function migrateMonster(raw: unknown): Monster {
   if (m.isInjured           === undefined) m.isInjured           = false;
   if (m.injuredHealStart    === undefined) m.injuredHealStart    = null;
   if (m.isSleeping          === undefined) m.isSleeping          = false;
+  if (m.isAtSpa             === undefined) m.isAtSpa             = false;
+  if (m.spaStart            === undefined) m.spaStart            = null;
   return applyOfflineDecay(m, Date.now());
 }
 
