@@ -26,7 +26,7 @@ const STAT_DETAILS: Record<string, { title: string; body: string }> = {
   },
   Energy: {
     title: "Energy",
-    body:  "Required to train. Regenerates +1 every 15 minutes — but only while Hunger is above 0. Maximum energy = 5 + floor(END ÷ 5). Higher END means more training sessions per day.",
+    body:  "Required to train. Regenerates +1 every 15 minutes but only while Hunger is above 0. Every 5 END gives +1 to max energy.",
   },
   HP: {
     title: "HP — Health Points",
