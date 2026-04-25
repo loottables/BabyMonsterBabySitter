@@ -255,7 +255,7 @@ export default function MonsterCanvas({ monster, anim, bare }: Props) {
       const curAnim = animRef.current;
 
       ctx.clearRect(0, 0, SIZE, SIZE);
-      drawMoonBackground(ctx);
+      if (!bare) drawMoonBackground(ctx);
 
       // ── EGG branch ─────────────────────────────────────────────────────
       if (!m.isHatched) {
