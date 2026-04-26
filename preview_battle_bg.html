@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Battle Background Preview</title>
+  <style>
+    body {
+      background: #080808;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+      font-family: monospace;
+      color: #666;
+      gap: 28px;
+    }
+    h2 { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; margin: 0; color: #777; }
+    p  { font-size: 9px; margin: 0; color: #444; }
+    canvas { image-rendering: pixelated; display: block; }
+
+    /* Mocks the encounter/battle panel styling */
+    .panel {
+      border: 1px solid #3a3a3a;
+      background: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .panel-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .label {
+      font-size: 8px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #888;
+    }
+    .label-dim { color: #444; }
+
+    /* Monster sprite placeholder */
+    .sprite {
+      border: 1px dashed #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+      font-size: 8px;
+      letter-spacing: 0.1em;
+    }
+
+    .row { display: flex; gap: 32px; align-items: flex-start; }
+    .col { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <h2>Background Canvas — raw (320 × 175 px)</h2>
+  <canvas id="raw" width="320" height="175"></canvas>
+
+  <div class="row">
+
+    <!-- Encounter panel mock -->
+    <div class="col">
+      <h2>Wild Encounter Panel (max-w-xs = 320px)</h2>
+      <div class="panel" style="width:320px">
+        <!-- Background image at top, monster overlaid -->
+        <div style="position:relative; width:320px; height:175px; overflow:hidden; flex-shrink:0">
+          <canvas id="enc" width="320" height="175" style="image-rendering:pixelated; display:block"></canvas>
+          <!-- Monster sprite sitting in the lower-center of the bg -->
+          <div class="sprite" style="position:absolute; bottom:16px; left:50%; transform:translateX(-50%); width:80px; height:80px">
+            MONSTER
+          </div>
+        </div>
+        <div class="panel-body">
+          <p class="label">A wild Monster appeared!</p>
+          <p class="label-dim">LV. 5</p>
+          <p class="label-dim" style="font-size:7px; margin-top:4px">ATK  DEF  HP …</p>
+          <div style="display:flex; gap:8px; margin-top:4px">
+            <div style="border:1px solid #3a3a3a; padding:6px 12px; font-size:7px; color:#888; letter-spacing:0.15em">BATTLE</div>
+            <div style="border:1px solid #3a3a3a; padding:6px 12px; font-size:7px; color:#555; letter-spacing:0.15em">RUN</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Battle view mock -->
+    <div class="col">
+      <h2>Battle View (full-screen overlay)</h2>
+      <div style="position:relative; width:400px; height:220px; overflow:hidden; border:1px solid #222">
+        <canvas id="battle" width="400" height="220" style="image-rendering:pixelated; display:block"></canvas>
+        <!-- Two monster sprites side by side -->
+        <div style="position:absolute; bottom:32px; left:0; right:0; display:flex; justify-content:center; gap:80px">
+          <div class="sprite" style="width:80px; height:80px">PLAYER</div>
+          <div class="sprite" style="width:80px; height:80px">WILD</div>
+        </div>
+      </div>
+      <p class="label-dim">background extends edge-to-edge in full-screen overlay</p>
+    </div>
+
+  </div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared draw function — works for any W / H
+// ─────────────────────────────────────────────────────────────────────────────
+function drawBg(ctx, W, H, PX) {
+  function px(c, r, v) {
+    if (c < 0 || c >= W || r < 0 || r >= H) return;
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(c * PX, r * PX, PX, PX);
+  }
+
+  const groundRow = Math.round(H * 2 / 3); // ground starts at 2/3 down
+
+  // ── Sky ────────────────────────────────────────────────────────────────────
+  for (let r = 0; r < groundRow; r++) {
+    for (let c = 0; c < W; c++) {
+      const v = 13 + Math.round(r * (28 / groundRow));
+      ctx.fillStyle = `rgb(${v},${v},${Math.round(v * 1.07)})`;
+      ctx.fillRect(c * PX, r * PX, PX, PX);
+    }
+  }
+
+  // Stars
+  const starSeeds = [[0,7],[0,18],[1,30],[0,44],[1,59],[0,69],[2,38],[1,13],[0,54]];
+  for (const [r, c] of starSeeds) {
+    const sc = Math.round(c * W / 80);
+    px(sc, r, 168);
+  }
+
+  // Clouds
+  for (const [r, cs, len] of [[5,8,10],[6,11,6],[4,52,9],[5,55,5]]) {
+    const sc = Math.round(cs * W / 80), slen = Math.round(len * W / 80);
+    for (let c = sc; c < sc + slen && c < W; c++) px(c, r, 34);
+  }
+
+  // ── Distant hills ──────────────────────────────────────────────────────────
+  const hillData = [
+    [0,16,18,27],[10,28,21,27],[22,38,19,27],
+    [50,66,20,27],[60,76,18,27],[72,80,22,27],
+  ];
+  for (const [lc0,rc0,pk,base] of hillData) {
+    const lc = Math.round(lc0 * W / 80), rc = Math.round(rc0 * W / 80);
+    const topPk = Math.round(pk * groundRow / 28);
+    const topBase = groundRow - 1;
+    const mid = (lc + rc) / 2;
+    for (let c = lc; c < rc && c < W; c++) {
+      const t = Math.abs(c - mid) / ((rc - lc) / 2);
+      const topR = Math.round(topPk + t * t * (topBase - topPk));
+      for (let r = topR; r < groundRow; r++) px(c, r, 26);
+    }
+  }
+
+  // ── City buildings ─────────────────────────────────────────────────────────
+  for (const [c0,topR0,w0] of [
+    [4,23,3],[8,20,2],[12,22,3],
+    [57,22,2],[61,24,3],[65,20,2],[69,22,3],[73,23,2],
+  ]) {
+    const c = Math.round(c0 * W / 80), w = Math.max(1, Math.round(w0 * W / 80));
+    const topR = Math.round(topR0 * groundRow / 28);
+    for (let r = topR; r < groundRow - 1; r++)
+      for (let dc = 0; dc < w; dc++) px(c + dc, r, 33);
+  }
+
+  // ── Pagoda (3-tier, center) ────────────────────────────────────────────────
+  const PC = Math.round(39 * W / 80);
+  const pagodaDef = [
+    [9,39,39],[10,38,40],[11,36,42],[12,38,40],[13,36,42],
+    [14,34,44],[15,33,45],[16,36,42],[17,36,42],
+    [18,31,47],[19,30,48],
+    [20,34,44],[21,34,44],[22,34,44],[23,34,44],
+    [24,33,45],[25,33,45],[26,33,45],
+  ];
+  for (const [r0,lc0,rc0] of pagodaDef) {
+    const r = Math.round(r0 * groundRow / 28);
+    const lc = Math.round(lc0 * W / 80), rc = Math.round(rc0 * W / 80);
+    for (let c = lc; c <= rc; c++) px(c, r, 35);
+  }
+
+  // ── Trees ──────────────────────────────────────────────────────────────────
+  function drawTree(tc0, topR0, rad0) {
+    const tc = Math.round(tc0 * W / 80);
+    const topR = Math.round(topR0 * groundRow / 28);
+    const rad = Math.max(2, Math.round(rad0 * W / 80));
+    for (let r = topR; r < topR + rad * 2; r++) {
+      for (let c = tc - rad; c <= tc + rad; c++) {
+        const dy = r - (topR + rad * 0.65), dx = c - tc;
+        if (dy*dy/(rad*rad*0.95) + dx*dx/(rad*rad) <= 1) px(c, r, 30);
+      }
+    }
+    for (let r = topR + rad; r < groundRow; r++) px(tc, r, 27);
+  }
+  drawTree(2,21,4); drawTree(9,23,3); drawTree(24,22,3);
+  drawTree(55,21,4); drawTree(71,20,5); drawTree(77,23,3);
+
+  // ── Ground (lower 1/3) ─────────────────────────────────────────────────────
+  for (let r = groundRow; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      const n = (c * 7 + r * 11) % 19;
+      const v = n < 5 ? 24 + n * 2 : 36 + (c*3 + r*7) % 14;
+      px(c, r, v);
+    }
+  }
+  for (let r = groundRow + 1; r < H - 1; r++) {
+    for (let c = 0; c < W; c++) {
+      if ((c*11 + r*13) % 17 === 0) px(c, r, 58);
+      if ((c*17 + r*9)  % 23 === 0) px(c, r, 50);
+    }
+  }
+
+  // ── Tall grass (3 rows, Pokémon style) ─────────────────────────────────────
+  const g1base = groundRow + 3, g2base = groundRow + 7, g3base = groundRow + 12;
+
+  // Back row
+  for (let c = 0; c < W; c++) {
+    if ((c * 3) % 5 >= 2) continue;
+    const h = 3 + c % 3, base = g1base;
+    for (let r = base - h; r <= base; r++) {
+      px(c, r, 46 + Math.round(((r-(base-h))/h)*12));
+    }
+    px(c + (c%2===0?-1:1), base-h-1, 54);
+  }
+
+  // Mid row
+  for (let c = 0; c < W; c++) {
+    if ((c*7+3) % 5 >= 3) continue;
+    const h = 5 + c % 3, base = g2base;
+    for (let r = base - h; r <= base; r++) {
+      px(c, r, 54 + Math.round(((r-(base-h))/h)*16));
+    }
+    const lean = c%3===0 ? -1 : 1;
+    px(c+lean, base-h-1, 64);
+  }
+
+  // Front row (tallest)
+  for (let c = 0; c < W; c += 2) {
+    const h = 7 + (c*5)%3, base = g3base;
+    for (let r = base - h; r <= base; r++) {
+      const v = 64 + Math.round(((r-(base-h))/h)*18);
+      px(c, r, v);
+      if (c+1 < W) px(c+1, r, v-8);
+    }
+    const lean = c%4<2 ? -1 : 1;
+    px(c+lean,  base-h-1, 76);
+    px(c-lean,  base-h-1, 70);
+  }
+}
+
+// ── Render all three canvases ─────────────────────────────────────────────────
+
+// Raw standalone (64×35 @ 5px = 320×175)
+(function() {
+  const W=64, H=35, PX=5;
+  const ctx = document.getElementById('raw').getContext('2d');
+  drawBg(ctx, W, H, PX);
+})();
+
+// Encounter panel (64×35 @ 5px = 320×175)
+(function() {
+  const W=64, H=35, PX=5;
+  const ctx = document.getElementById('enc').getContext('2d');
+  drawBg(ctx, W, H, PX);
+})();
+
+// Battle view (80×44 @ 5px = 400×220)
+(function() {
+  const W=80, H=44, PX=5;
+  const ctx = document.getElementById('battle').getContext('2d');
+  drawBg(ctx, W, H, PX);
+})();
+</script>
+</body>
+</html>

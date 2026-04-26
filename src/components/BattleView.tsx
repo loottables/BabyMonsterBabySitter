@@ -5,13 +5,17 @@ import dynamic from "next/dynamic";
 import type { Monster } from "@/types/game";
 import type { PendingEncounter } from "@/hooks/useGameState";
 import { wildToDisplayMonster } from "@/lib/battleEngine";
+import BattleBgCanvas from "./BattleBgCanvas";
 
 const MonsterCanvas = dynamic(() => import("./MonsterCanvas"), { ssr: false });
 
 // MonsterCanvas always renders at 320×320 CSS px; scale it down for battle
-const SCALE   = 0.5;
-const VISUAL  = 320 * SCALE; // 160px
-const SHIFT   = 70;          // px the sprite lunges toward the opponent
+const SCALE  = 0.5;
+const VISUAL = 320 * SCALE; // 160px
+const SHIFT  = 70;          // px the sprite lunges toward the opponent
+
+// Background canvas natural width (80 columns × 5 px/cell)
+const BG_W = 80 * 5; // 400px
 
 // ── HP bar ─────────────────────────────────────────────────────────────────
 
@@ -29,52 +33,6 @@ function HpBar({ current, max }: { current: number; max: number }) {
       <p style={{ fontSize: "6px" }} className="text-monster-muted tabular-nums text-right">
         {current} / {max}
       </p>
-    </div>
-  );
-}
-
-// ── Battle combatant panel ─────────────────────────────────────────────────
-
-interface CombatantProps {
-  displayMonster: Monster;
-  name:           string;
-  level:          number;
-  hp:             number;
-  maxHp:          number;
-  side:           "left" | "right";
-  attacking:      boolean;
-}
-
-function Combatant({ displayMonster, name, level, hp, maxHp, side, attacking }: CombatantProps) {
-  const shift = attacking ? (side === "left" ? SHIFT : -SHIFT) : 0;
-
-  return (
-    <div className="flex flex-col items-center gap-2" style={{ width: VISUAL }}>
-      {/* Name + level — always static */}
-      <p style={{ fontSize: "7px" }} className="text-monster-text uppercase tracking-wide text-center">
-        {name} <span className="text-monster-muted">Lv.{level}</span>
-      </p>
-
-      {/* Container fixes the layout space; sprite shifts freely inside */}
-      <div style={{ width: VISUAL, height: VISUAL, position: "relative" }}>
-        <div
-          style={{
-            position:   "absolute",
-            top:        0,
-            left:       0,
-            transform:  `translateX(${shift}px)`,
-            transition: "transform 250ms ease-out",
-          }}
-        >
-          {/* Scale the 320px canvas down to VISUAL size, origin top-left */}
-          <div style={{ transform: `scale(${SCALE})`, transformOrigin: "top left", width: 320, height: 320 }}>
-            <MonsterCanvas monster={displayMonster} anim="idle" bare />
-          </div>
-        </div>
-      </div>
-
-      {/* HP bar — always static */}
-      <HpBar current={hp} max={maxHp} />
     </div>
   );
 }
@@ -170,31 +128,71 @@ export default function BattleView({ encounter, playerMonster, onComplete }: Pro
     ? Math.min(100, Math.round((Math.max(0, roundIdx) / rounds.length) * 100))
     : 0;
 
+  const playerShift = attacking === "player" ?  SHIFT : 0;
+  const wildShift   = attacking === "wild"   ? -SHIFT : 0;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-4"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 px-4"
       style={{ backgroundColor: "rgba(0,0,0,0.85)" }}
     >
-      {/* Monsters — names and HP bars are static; only sprites shift */}
-      <div className="flex items-end justify-center gap-12">
-        <Combatant
-          displayMonster={playerMonster}
-          name={playerMonster.name}
-          level={playerMonster.rpg.level}
-          hp={playerHp}
-          maxHp={playerMonster.rpg.maxHp}
-          side="left"
-          attacking={attacking === "player"}
-        />
-        <Combatant
-          displayMonster={wildDisplay}
-          name={wildMonster.name}
-          level={wildMonster.level}
-          hp={wildHp}
-          maxHp={wildMonster.rpg.maxHp}
-          side="right"
-          attacking={attacking === "wild"}
-        />
+      {/* Scene: background canvas with sprites overlaid at ground level */}
+      <div style={{ position: "relative", width: BG_W, flexShrink: 0 }}>
+        <BattleBgCanvas />
+        <div
+          className="flex items-end justify-center gap-12"
+          style={{ position: "absolute", bottom: 4, left: 0, right: 0 }}
+        >
+          {/* Player sprite */}
+          <div style={{ width: VISUAL, height: VISUAL, position: "relative", flexShrink: 0 }}>
+            <div
+              style={{
+                position:   "absolute",
+                top:        0,
+                left:       0,
+                transform:  `translateX(${playerShift}px)`,
+                transition: "transform 250ms ease-out",
+              }}
+            >
+              <div style={{ transform: `scale(${SCALE})`, transformOrigin: "top left", width: 320, height: 320 }}>
+                <MonsterCanvas monster={playerMonster} anim="idle" bare />
+              </div>
+            </div>
+          </div>
+
+          {/* Wild sprite */}
+          <div style={{ width: VISUAL, height: VISUAL, position: "relative", flexShrink: 0 }}>
+            <div
+              style={{
+                position:   "absolute",
+                top:        0,
+                left:       0,
+                transform:  `translateX(${wildShift}px)`,
+                transition: "transform 250ms ease-out",
+              }}
+            >
+              <div style={{ transform: `scale(${SCALE})`, transformOrigin: "top left", width: 320, height: 320 }}>
+                <MonsterCanvas monster={wildDisplay} anim="idle" bare />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Names + HP bars below the scene */}
+      <div className="flex justify-center gap-12" style={{ width: BG_W }}>
+        <div className="flex flex-col items-center gap-2" style={{ width: VISUAL }}>
+          <p style={{ fontSize: "7px" }} className="text-monster-text uppercase tracking-wide text-center">
+            {playerMonster.name} <span className="text-monster-muted">Lv.{playerMonster.rpg.level}</span>
+          </p>
+          <HpBar current={playerHp} max={playerMonster.rpg.maxHp} />
+        </div>
+        <div className="flex flex-col items-center gap-2" style={{ width: VISUAL }}>
+          <p style={{ fontSize: "7px" }} className="text-monster-text uppercase tracking-wide text-center">
+            {wildMonster.name} <span className="text-monster-muted">Lv.{wildMonster.level}</span>
+          </p>
+          <HpBar current={wildHp} max={wildMonster.rpg.maxHp} />
+        </div>
       </div>
 
       {/* Status message */}
