@@ -25,6 +25,24 @@ function buildOffscreen(grid: PixelGrid): HTMLCanvasElement {
     img.data[i * 4 + 2] = g;
     img.data[i * 4 + 3] = 255;
   }
+  // Force border pixels to a fixed dark value so the outline always reads against
+  // any background regardless of the monster's own brightness.
+  for (let y = 0; y < 64; y++) {
+    for (let x = 0; x < 64; x++) {
+      const i = y * 64 + x;
+      if (grid[i] === 0) continue;
+      const border =
+        (x === 0  || grid[i - 1]  === 0) ||
+        (x === 63 || grid[i + 1]  === 0) ||
+        (y === 0  || grid[i - 64] === 0) ||
+        (y === 63 || grid[i + 64] === 0);
+      if (border) {
+        img.data[i * 4]     = 18;
+        img.data[i * 4 + 1] = 18;
+        img.data[i * 4 + 2] = 18;
+      }
+    }
+  }
   ctx.putImageData(img, 0, 0);
   return oc;
 }
