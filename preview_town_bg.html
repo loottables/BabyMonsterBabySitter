@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Town Background Preview</title>
+  <style>
+    body {
+      background: #080808;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 40px; font-family: monospace; color: #666; gap: 28px;
+    }
+    h2  { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; margin: 0; color: #777; }
+    p   { font-size: 9px; margin: 0; color: #444; }
+    canvas { image-rendering: pixelated; display: block; }
+    .row { display: flex; gap: 40px; align-items: flex-start; }
+    .col { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+    .mock {
+      position: relative;
+      border: 2px solid #3a3a3a;
+      border-radius: 12px;
+      overflow: hidden;
+      width: 320px; height: 320px;
+    }
+    .monster-placeholder {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 96px; height: 96px;
+      border: 1px dashed #444;
+      display: flex; align-items: center; justify-content: center;
+      color: #333; font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <h2>Town Background Preview — 320 × 320 px (64 × 64 grid · 5 px/cell)</h2>
+  <div class="row">
+    <div class="col">
+      <p>Background only</p>
+      <canvas id="raw" width="320" height="320"></canvas>
+    </div>
+    <div class="col">
+      <p>In-game (monster placeholder in center)</p>
+      <div class="mock">
+        <canvas id="mock" width="320" height="320"></canvas>
+        <div class="monster-placeholder">Monster</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const W = 64, H = 64, PX = 5;  // 320 × 320 px
+
+function drawTownBg(ctx) {
+  function px(c, r, v) {
+    if (c < 0 || c >= W || r < 0 || r >= H) return;
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(c * PX, r * PX, PX, PX);
+  }
+
+  const horizonRow = 48;
+  const TC = 32, TV = 52, TP = 7;
+  const pathL = TC - 5, pathR = TC + 5;
+
+  // ── Sky (daytime: light grey gradient) ──────────────────────────────────
+  for (let r = 0; r < horizonRow; r++) {
+    for (let c = 0; c < W; c++) {
+      const v = 70 + Math.round(r * 14 / horizonRow); // 70 at top → 84 near horizon
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
+      ctx.fillRect(c * PX, r * PX, PX, PX);
+    }
+  }
+
+  // Fluffy daytime clouds (brighter than sky)
+  // Cloud 1: left-centre, rows 6-13
+  for (const [r, l, re] of [[7,5,15],[8,4,17],[9,3,18],[10,4,17],[11,5,15],[12,7,13]]) {
+    for (let c = l; c <= re && c < W; c++) {
+      const v = 94 + Math.round((1 - Math.abs(r - 9) / 5) * 12);
+      ctx.fillStyle = `rgb(${v},${v},${v})`; ctx.fillRect(c*PX, r*PX, PX, PX);
+    }
+  }
+  // Cloud 2: right side, rows 12-18
+  for (const [r, l, re] of [[13,41,51],[14,39,53],[15,38,54],[16,39,53],[17,41,51],[18,43,49]]) {
+    for (let c = l; c <= re && c < W; c++) {
+      const v = 92 + Math.round((1 - Math.abs(r - 15) / 4) * 12);
+      ctx.fillStyle = `rgb(${v},${v},${v})`; ctx.fillRect(c*PX, r*PX, PX, PX);
+    }
+  }
+  // Cloud 3: small, upper right
+  for (const [r, l, re] of [[4,49,57],[5,48,58],[6,49,57]]) {
+    for (let c = l; c <= re && c < W; c++) {
+      ctx.fillStyle = `rgb(91,91,91)`; ctx.fillRect(c*PX, r*PX, PX, PX);
+    }
+  }
+
+  // ── Distant hills ────────────────────────────────────────────────────────
+  for (const [lc, rc, pk] of [
+    [0,20,30],[14,32,28],[28,46,26],[42,58,29],[54,64,32],
+  ]) {
+    const mid = (lc + rc) / 2;
+    for (let c = lc; c < rc && c < W; c++) {
+      const t    = Math.abs(c - mid) / ((rc - lc) / 2);
+      const topR = Math.round(pk + t * t * (horizonRow - 1 - pk));
+      for (let r = topR; r < horizonRow; r++) px(c, r, 60);
+    }
+  }
+
+  // ── Distant city clusters ────────────────────────────────────────────────
+  for (const [c, topR, w] of [
+    [1,32,2],[4,29,2],[7,33,2],[10,30,2],
+    [53,33,2],[56,30,2],[59,34,2],
+  ]) {
+    for (let r = topR; r < horizonRow - 1; r++)
+      for (let dc = 0; dc < w; dc++) px(c + dc, r, 50);
+  }
+
+  // ── Distant pagoda (right background) ───────────────────────────────────
+  for (const [r, lc, rc] of [
+    [16,49,49],[17,48,50],[18,46,52],[19,48,50],[20,48,50],[21,44,54],
+    [22,46,52],[23,46,52],[24,42,56],[25,44,54],[26,44,54],[27,44,54],
+    [28,40,58],[29,42,56],[30,43,55],[31,43,55],[32,43,55],[33,43,55],[34,43,55],[35,42,56],
+  ]) {
+    for (let c = lc; c <= rc; c++) px(c, r, 52);
+  }
+
+  // ── Trees ────────────────────────────────────────────────────────────────
+  function drawTree(tc, topR, rad, v) {
+    for (let r = topR; r < topR + rad * 2; r++) {
+      for (let c = tc - rad; c <= tc + rad; c++) {
+        const dy = r - (topR + rad * 0.65), dx = c - tc;
+        if (dy * dy / (rad * rad * 0.95) + dx * dx / (rad * rad) <= 1) px(c, r, v);
+      }
+    }
+    for (let r = topR + rad; r <= horizonRow; r++) px(tc, r, v - 5);
+  }
+  drawTree(11, 33, 5, 54);
+  drawTree(53, 31, 6, 52);
+  drawTree(20, 40, 3, 55);
+  drawTree(44, 39, 3, 53);
+
+  // ── Modern buildings (flat-roofed, windowed, varied heights) ────────────
+  // fill: body colour  win: window colour (lighter, lit)  top: row where roof starts
+  function drawBuilding(left, top, right, fill, win) {
+    // Body
+    for (let r = top; r < horizonRow; r++)
+      for (let c = left; c <= right; c++) px(c, r, fill);
+    // Roof edge (1 px lighter parapet)
+    for (let c = left; c <= right; c++) px(c, top, fill + 7);
+    // Windows: 2×2 blocks, spaced every 4 cols / 4 rows
+    for (let r = top + 3; r < horizonRow - 2; r += 4)
+      for (let c = left + 2; c + 1 <= right - 1; c += 4) {
+        px(c, r, win); px(c+1, r, win);
+        if (r + 1 < horizonRow - 2) { px(c, r+1, win); px(c+1, r+1, win); }
+      }
+  }
+
+  // Rooftop details (water tank + antenna — common on Japanese buildings)
+  function roofDetails(c, topRow, fill) {
+    // Small box (stairwell/tank housing)
+    px(c, topRow - 2, fill + 4); px(c+1, topRow - 2, fill + 4);
+    px(c, topRow - 1, fill + 4); px(c+1, topRow - 1, fill + 4);
+    // Thin antenna 1 cell above box
+    px(c, topRow - 3, fill + 2);
+  }
+
+  // ── Left cluster ────────────────────────────────────────────────────────
+  // Tall narrow office block
+  drawBuilding(0, 23, 8, 44, 63);
+  roofDetails(2, 23, 44);
+  // Shorter wide building (mix of shop + residential)
+  drawBuilding(9, 35, 22, 47, 66);
+  roofDetails(13, 35, 47);
+  // Small single-storey shop at very front-left
+  drawBuilding(0, 41, 7, 50, 68);
+  // Storefront strip on the shop (wide window band near ground)
+  for (let c = 1; c <= 6; c++) { px(c, 44, 70); px(c, 45, 70); px(c, 46, 70); }
+
+  // ── Right cluster ───────────────────────────────────────────────────────
+  // Tall building (slightly taller than left)
+  drawBuilding(55, 21, 63, 43, 62);
+  roofDetails(58, 21, 43);
+  // Medium building
+  drawBuilding(41, 33, 54, 46, 65);
+  roofDetails(44, 33, 46);
+  // Small shop at front-right
+  drawBuilding(56, 40, 63, 50, 68);
+  for (let c = 57; c <= 62; c++) { px(c, 43, 70); px(c, 44, 70); px(c, 45, 70); }
+
+  // ── Torii gate ───────────────────────────────────────────────────────────
+  for (let c = TC - TP - 4; c <= TC + TP + 4; c++) {
+    const dist = Math.abs(c - TC);
+    px(c, dist >= TP + 3 ? 34 : dist >= TP + 2 ? 35 : 36, TV);
+  }
+  for (let c = TC - TP - 2; c <= TC + TP + 2; c++) px(c, 38, TV);
+  for (let r = 37; r < horizonRow; r++) {
+    px(TC - TP, r, TV); px(TC - TP - 1, r, TV);
+    px(TC + TP, r, TV); px(TC + TP + 1, r, TV);
+  }
+  for (let c = TC - TP - 2; c <= TC + TP + 2; c++) px(c, 42, TV);
+
+  // ── Stone lanterns ───────────────────────────────────────────────────────
+  for (const lc of [TC - TP - 5, TC + TP + 4]) {
+    const LV = 54;
+    px(lc, 43, LV); px(lc + 1, 43, LV);
+    px(lc-1, 44, LV); px(lc, 44, LV); px(lc+1, 44, LV); px(lc+2, 44, LV);
+    px(lc, 45, LV); px(lc+1, 45, LV);
+    for (let c = lc-1; c <= lc+2; c++) px(c, 46, 82); // lantern window
+    px(lc, 47, LV); px(lc+1, 47, LV);
+    px(lc-1, 47, LV); px(lc+2, 47, LV);
+  }
+
+  // ── Ground (rows 48-63) ──────────────────────────────────────────────────
+  for (let r = horizonRow; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      const depth = (r - horizonRow) / (H - horizonRow);
+      const base  = Math.round(68 + depth * 55); // 68 → 123
+      const n     = (c * 7 + r * 11) % 13;
+      const noise = n < 2 ? -14 : n < 5 ? -7 : n < 9 ? 0 : 7;
+      px(c, r, Math.max(50, Math.min(145, base + noise)));
+    }
+  }
+
+  // Stone path (center)
+  for (let r = horizonRow; r < H; r++) {
+    const depth = (r - horizonRow) / (H - horizonRow);
+    for (let c = pathL; c <= pathR; c++) {
+      const v = Math.round(98 + depth * 28);
+      const n = (c * 5 + r * 7) % 9;
+      px(c, r, v + (n < 3 ? 10 : 0));
+    }
+  }
+
+  // Ground grass tufts
+  for (let r = horizonRow + 1; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      if (c >= pathL - 1 && c <= pathR + 1) continue;
+      const depth = (r - horizonRow) / (H - horizonRow);
+      if ((c * 11 + r * 13) % 23 === 0)
+        px(c, r, Math.round(88 + depth * 22));
+    }
+  }
+
+  // ── Tall grass at horizon (drawn last — in front of everything) ──────────
+  // Sparse back row: across the full width except the path
+  for (let c = 0; c < W; c++) {
+    if (c >= pathL - 2 && c <= pathR + 2) continue;
+    if ((c * 7 + 3) % 5 >= 3) continue;
+    const h = 3 + c % 3, base = horizonRow + 1;
+    for (let r = base - h; r <= base; r++)
+      px(c, r, 58 + Math.round(((r - (base - h)) / h) * 10));
+    px(c + (c % 2 === 0 ? -1 : 1), base - h - 1, 64);
+  }
+
+  // Denser front row: house zones only (left ≤22, right ≥42)
+  for (let c = 0; c < W; c += 2) {
+    const inHouseZone = c <= 22 || c >= 42;
+    if (!inHouseZone) continue;
+    if (c >= pathL - 2 && c <= pathR + 2) continue;
+    const h = 5 + (c * 3) % 3, base = horizonRow + 2;
+    for (let r = base - h; r <= base; r++) {
+      const v = 62 + Math.round(((r - (base - h)) / h) * 14);
+      px(c, r, v);
+      if (c + 1 < W) px(c + 1, r, v - 6);
+    }
+    const lean = c % 4 < 2 ? -1 : 1;
+    px(c + lean, base - h - 1, 70);
+    px(c - lean, base - h - 1, 64);
+  }
+}
+
+// Render both canvases
+drawTownBg(document.getElementById('raw').getContext('2d'));
+drawTownBg(document.getElementById('mock').getContext('2d'));
+</script>
+</body>
+</html>
