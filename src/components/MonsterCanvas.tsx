@@ -3,6 +3,7 @@
 import { useEffect, useRef, useMemo } from "react";
 import type { Monster, AnimationState } from "@/types/game";
 import { generateMonster, generateEgg, POOP_SPRITE, type PixelGrid } from "@/lib/monsterGenerator";
+import { drawTownBackground } from "@/lib/monsterBackgrounds";
 
 const PIXEL = 5;          // CSS px per grid pixel
 const SIZE  = 64 * PIXEL; // 320 CSS px
@@ -101,109 +102,6 @@ function crackCountFromProgress(p: number): number {
   return 6;
 }
 
-// ── backgrounds ───────────────────────────────────────────────────────────
-
-let moonBgCache: HTMLCanvasElement | null = null;
-
-function buildMoonBg(): HTMLCanvasElement {
-  const oc = document.createElement("canvas");
-  oc.width = oc.height = SIZE;
-  const ctx = oc.getContext("2d")!;
-
-  // Horizon curves down from the center outward (~3 grid-rows of drop at the edges)
-  const K = 3 / (32 * 32);
-  const surfRow = (c: number) => Math.round(32 + K * (c - 32) ** 2);
-
-  // Surface — column-by-column so each column clips to the curved horizon
-  for (let col = 0; col < 64; col++) {
-    const top = surfRow(col);
-    for (let row = top; row < 64; row++) {
-      const t = (row - 32) / 32; // 0 = horizon, 1 = bottom
-      const v = Math.round(186 - t * 13);
-      ctx.fillStyle = `rgb(${v},${v - 2},${v + 10})`;
-      ctx.fillRect(col * PIXEL, row * PIXEL, PIXEL, PIXEL);
-    }
-  }
-
-  // Light direction: upper-left, normalised
-  const lMag = Math.hypot(0.6, 1.0);
-  const lx = -0.6 / lMag, ly = -1.0 / lMag;
-
-  // Craters — radial normal shading so highlights/shadows curve with the rim
-  const craters = [
-    { cx: 10, cy: 43, r: 3.5 },
-    { cx: 27, cy: 51, r: 5.5 },
-    { cx: 50, cy: 41, r: 4.0 },
-    { cx: 14, cy: 58, r: 2.5 },
-    { cx: 54, cy: 57, r: 3.0 },
-  ];
-
-  for (const { cx, cy, r } of craters) {
-    for (let row = Math.floor(cy - r - 1); row <= Math.ceil(cy + r + 1); row++) {
-      for (let col = Math.floor(cx - r - 1); col <= Math.ceil(cx + r + 1); col++) {
-        if (col < 0 || col >= 64 || row < surfRow(col) || row >= 64) continue;
-        const dx = col - cx, dy = row - cy;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > r + 0.7) continue;
-        const nx = dist > 0.01 ? dx / dist : 0;
-        const ny = dist > 0.01 ? dy / dist : 0;
-        let v: number;
-        if (dist < r - 0.5) {
-          // Bowl interior: deeper = darker; wall facing light is brighter
-          const depth = 1 - dist / r;
-          const face  = nx * lx + ny * ly;
-          v = Math.round(160 + face * 16 - depth * 24);
-        } else {
-          // Raised rim: lit where the outward normal points toward the light
-          const face = -(nx * lx + ny * ly);
-          v = Math.round(174 + face * 42);
-        }
-        v = Math.max(90, Math.min(225, v));
-        ctx.fillStyle = `rgb(${v},${v - 2},${v + 10})`;
-        ctx.fillRect(col * PIXEL, row * PIXEL, PIXEL, PIXEL);
-      }
-    }
-  }
-
-  // Small rocks — irregular pixel clusters with a top highlight and right shadow
-  const rocks: { gc: number; gr: number; pixels: [number, number][] }[] = [
-    { gc: 5,  gr: 38, pixels: [[0,0],[1,0],[0,-1]] },
-    { gc: 19, gr: 45, pixels: [[0,0],[1,0],[2,0],[1,-1]] },
-    { gc: 37, gr: 40, pixels: [[0,0],[1,0]] },
-    { gc: 42, gr: 54, pixels: [[0,0],[1,0],[0,-1]] },
-    { gc: 58, gr: 47, pixels: [[0,0],[1,0],[2,0]] },
-    { gc: 8,  gr: 57, pixels: [[0,0],[1,0]] },
-    { gc: 46, gr: 61, pixels: [[0,0],[1,0]] },
-    { gc: 31, gr: 36, pixels: [[0,0]] },
-    { gc: 21, gr: 60, pixels: [[0,0],[1,0],[0,-1]] },
-  ];
-
-  for (const { gc, gr, pixels } of rocks) {
-    if (gr < surfRow(gc)) continue;
-    for (const [dc, dr] of pixels) {
-      const col = gc + dc, row = gr + dr;
-      if (col < 0 || col >= 64 || row < 0 || row >= 64) continue;
-      if (row < surfRow(col)) continue;
-      const v = dr < 0 ? 195 : 158; // top face lighter
-      ctx.fillStyle = `rgb(${v},${v - 2},${v + 10})`;
-      ctx.fillRect(col * PIXEL, row * PIXEL, PIXEL, PIXEL);
-    }
-    // Shadow pixel to the right
-    const shadowCol = gc + Math.max(...pixels.map(([dc]) => dc)) + 1;
-    if (shadowCol < 64 && gr < 64 && gr >= surfRow(shadowCol)) {
-      ctx.fillStyle = "rgb(108,106,122)";
-      ctx.fillRect(shadowCol * PIXEL, gr * PIXEL, PIXEL, PIXEL);
-    }
-  }
-
-  return oc;
-}
-
-function drawMoonBackground(ctx: CanvasRenderingContext2D) {
-  if (!moonBgCache) moonBgCache = buildMoonBg();
-  ctx.drawImage(moonBgCache, 0, 0);
-}
-
 // ── component ─────────────────────────────────────────────────────────────
 
 interface Props {
@@ -255,7 +153,7 @@ export default function MonsterCanvas({ monster, anim, bare }: Props) {
       const curAnim = animRef.current;
 
       ctx.clearRect(0, 0, SIZE, SIZE);
-      if (!bare) drawMoonBackground(ctx);
+      if (!bare) drawTownBackground(ctx);
 
       // ── EGG branch ─────────────────────────────────────────────────────
       if (!m.isHatched) {
