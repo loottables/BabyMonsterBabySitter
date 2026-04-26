@@ -1,8 +1,20 @@
 import type { Inventory, ItemId } from "@/types/items";
+import { ITEM_DEFS } from "@/types/items";
 
 function compact(inv: Inventory): Inventory {
   const filled = inv.filter(s => s !== null);
   return [...filled, ...Array(inv.length - filled.length).fill(null)] as Inventory;
+}
+
+// Strips slots with unknown itemIds (from stale saves) and re-compacts.
+export function sanitizeInventory(inv: unknown[]): Inventory {
+  const valid = new Set(Object.keys(ITEM_DEFS));
+  const cleaned = inv.map((s: unknown) =>
+    s && typeof s === "object" && "itemId" in s && valid.has((s as { itemId: string }).itemId)
+      ? s as Inventory[number]
+      : null
+  );
+  return compact(cleaned);
 }
 
 // New players start with 20 kibble in slot 0; remaining slots empty

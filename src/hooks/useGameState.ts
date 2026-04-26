@@ -14,7 +14,7 @@ import {
 import { resolveAdventure, type AdventureResultData } from "@/lib/adventureEngine";
 import type { WildMonster, BattleResult } from "@/lib/battleEngine";
 import {
-  consumeSlot, deleteSlot, createDefaultInventory, addToInventory,
+  consumeSlot, deleteSlot, createDefaultInventory, addToInventory, sanitizeInventory,
 } from "@/lib/inventory";
 import { ITEM_DEFS } from "@/types/items";
 import { STARTING_COINS, ADVENTURE_DURATION_MS, AUTOSLEEP_INACTIVE_MS, AUTOSLEEP_HOUR, SPA_COST, SPA_DURATION_MS } from "@/lib/constants";
@@ -383,7 +383,7 @@ export function useGameState() {
         .single();
       if (cancelled) return;
       const m   = data?.monster   ? migrateMonster(data.monster)   : null;
-      const inv = data?.inventory ?? createDefaultInventory();
+      const inv = sanitizeInventory(data?.inventory ?? createDefaultInventory());
       const c   = data?.coins     ?? STARTING_COINS;
       const pe  = (data as { pending_encounter?: PendingEncounter | null })?.pending_encounter ?? null;
       dispatch({ type: "LOAD", monster: m, inventory: inv, coins: c, pendingEncounter: pe });
