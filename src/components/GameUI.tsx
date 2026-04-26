@@ -434,11 +434,11 @@ export default function GameUI() {
 
             {/* Level + status overlay — top of the canvas window */}
             <div className="absolute top-0 left-0 right-0 flex flex-col items-center gap-1 pt-2 pointer-events-none">
-              <span style={{ fontSize: "6px" }} className="text-monster-muted uppercase tracking-widest">
+              <span style={{ fontSize: "6px", textShadow: "0 1px 3px rgba(0,0,0,0.9)" }} className="text-white uppercase tracking-widest">
                 Lv.{monster.rpg.level}
               </span>
               {(monster.isSick || monster.isInjured || monster.care.hunger <= 20 || monster.care.happiness <= 20 || monster.poops.length >= 3) && (
-                <div style={{ fontSize: "6px" }} className="flex gap-2 text-monster-muted uppercase tracking-widest">
+                <div style={{ fontSize: "6px", textShadow: "0 1px 3px rgba(0,0,0,0.9)" }} className="flex gap-2 text-white uppercase tracking-widest">
                   {monster.isSick                && <span className="animate-pulse">! Sick</span>}
                   {monster.isInjured             && <span className="animate-pulse cursor-help" title="Use a First Aid Kit or keep your monster at full HP for 30 minutes to recover.">! Injured</span>}
                   {monster.care.hunger <= 20     && <span className="animate-pulse">! Hungry</span>}
