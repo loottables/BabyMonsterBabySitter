@@ -8,66 +8,157 @@ const PX = 5;
 const W  = 64;
 const H  = 28;
 
+function px(ctx: CanvasRenderingContext2D, c: number, r: number, v: number) {
+  ctx.fillStyle = `rgb(${v},${v},${v})`;
+  ctx.fillRect(c * PX, r * PX, PX, PX);
+}
+
 function drawSpa(ctx: CanvasRenderingContext2D) {
-  // Checker floor
+  // ── Sky ──────────────────────────────────────────────────────────────
   for (let r = 0; r < H; r++) {
     for (let c = 0; c < W; c++) {
-      ctx.fillStyle = (r + c) % 2 === 0 ? "rgb(38,36,42)" : "rgb(32,30,36)";
+      const v = 16 + Math.min(r * 2, 18); // subtle top-to-horizon gradient
+      ctx.fillStyle = `rgb(${v},${Math.round(v * 0.95)},${v + 5})`;
       ctx.fillRect(c * PX, r * PX, PX, PX);
     }
   }
 
-  // Pool outer edge
-  ctx.fillStyle = "rgb(95,93,100)";
-  for (let c = 6; c <= 57; c++) {
-    ctx.fillRect(c * PX,  4 * PX, PX, PX);
-    ctx.fillRect(c * PX, 23 * PX, PX, PX);
-  }
-  for (let r = 5; r <= 22; r++) {
-    ctx.fillRect( 6 * PX, r * PX, PX, PX);
-    ctx.fillRect(57 * PX, r * PX, PX, PX);
-  }
+  // Stars
+  for (const [r, c] of [[0,7],[1,18],[0,29],[1,38],[0,50],[1,58],[2,12],[0,44]] as const)
+    px(ctx, c, r, 175);
 
-  // Pool corners (slightly darker)
-  ctx.fillStyle = "rgb(75,73,80)";
-  for (const [r, c] of [[4,6],[4,57],[23,6],[23,57]] as const) {
-    ctx.fillRect(c * PX, r * PX, PX, PX);
+  // ── Ground ───────────────────────────────────────────────────────────
+  for (let r = 18; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      const v = 36 + ((c * 5 + r * 7) % 6);
+      px(ctx, c, r, v);
+    }
   }
-
-  // Water
-  ctx.fillStyle = "rgb(45,80,110)";
-  for (let r = 5; r <= 22; r++) {
-    for (let c = 7; c <= 56; c++) {
-      ctx.fillRect(c * PX, r * PX, PX, PX);
+  // Stone path (center)
+  for (let r = 18; r < H; r++) {
+    for (let c = 25; c <= 39; c++) {
+      const v = 55 + ((c * 3 + r * 9) % 9);
+      px(ctx, c, r, v);
     }
   }
 
-  // Ripple highlights
-  ctx.fillStyle = "rgb(75,115,145)";
-  for (const [r, c] of [[7,15],[7,30],[7,44],[12,20],[12,38],[12,52],[18,10],[18,28],[18,46],[21,16],[21,42]] as const) {
-    ctx.fillRect( c      * PX, r * PX, PX, PX);
-    ctx.fillRect((c + 1) * PX, r * PX, PX, PX);
+  // ── Mountain silhouettes ─────────────────────────────────────────────
+  const leftPeaks  = [12,11,10,9,8,8,7,8,9,10,11,12,13,14,15,16,17];
+  const rightPeaks = [17,16,15,14,13,12,11,10,9,8,8,7,8,9,10,11,12];
+  for (let c = 0; c < 17; c++) {
+    for (let r = leftPeaks[c]; r < 19; r++) px(ctx, c, r, 36);
+  }
+  for (let i = 0; i < 17; i++) {
+    const c = 47 + i;
+    for (let r = rightPeaks[i]; r < 19; r++) px(ctx, c, r, 36);
   }
 
-  // Steam wisps
-  ctx.fillStyle = "rgb(150,150,155)";
-  for (const [r, c] of [[1,16],[2,17],[1,25],[2,26],[2,24],[1,33],[2,33],[2,34],[1,41],[2,42],[1,50],[2,49]] as const) {
-    ctx.fillRect(c * PX, r * PX, PX, PX);
+  // ── Building walls ───────────────────────────────────────────────────
+  for (let r = 8; r < 18; r++)
+    for (let c = 17; c <= 47; c++) px(ctx, c, r, 60);
+
+  // Paper screens (lit from inside) — grid lines give shoji look
+  for (const [wl, wr] of [[19, 26], [38, 45]] as const) {
+    for (let r = 9; r <= 14; r++) {
+      for (let c = wl; c <= wr; c++) {
+        const v = 148 + (r % 2 === 0 ? 8 : 0) + (c % 3 === 0 ? 12 : 0);
+        px(ctx, c, r, v);
+      }
+    }
+    // Frame
+    ctx.fillStyle = "rgb(40,38,46)";
+    for (let r = 9; r <= 14; r++) {
+      ctx.fillRect((wl - 1) * PX, r * PX, PX, PX);
+      ctx.fillRect((wr + 1) * PX, r * PX, PX, PX);
+    }
+    for (let c = wl - 1; c <= wr + 1; c++) {
+      ctx.fillRect(c * PX, 8 * PX, PX, PX);
+      ctx.fillRect(c * PX, 15 * PX, PX, PX);
+    }
   }
 
-  // Left candle body
-  ctx.fillStyle = "rgb(165,160,140)";
-  for (let r = 9; r <= 17; r++) ctx.fillRect(2 * PX, r * PX, PX, PX);
-  // Left candle flame
-  ctx.fillStyle = "rgb(200,120,30)";
-  ctx.fillRect(2 * PX, 8 * PX, PX, PX);
+  // Door
+  for (let r = 13; r < 18; r++)
+    for (let c = 29; c <= 35; c++) px(ctx, c, r, 28);
 
-  // Right candle body
-  ctx.fillStyle = "rgb(165,160,140)";
-  for (let r = 9; r <= 17; r++) ctx.fillRect(61 * PX, r * PX, PX, PX);
-  // Right candle flame
-  ctx.fillStyle = "rgb(200,120,30)";
-  ctx.fillRect(61 * PX, 8 * PX, PX, PX);
+  // ── Roof (tiered Japanese style) ─────────────────────────────────────
+  // Each level: [row, leftCol, rightCol]
+  const roofLevels: [number, number, number][] = [
+    [7, 13, 51], // eave (widest)
+    [6, 17, 47],
+    [5, 20, 44],
+    [4, 23, 41],
+    [3, 26, 38],
+    [2, 28, 36],
+    [1, 30, 34],
+  ];
+  for (const [row, lc, rc] of roofLevels) {
+    const v = row <= 3 ? 82 : row <= 5 ? 68 : 56;
+    for (let c = lc; c <= rc; c++) px(ctx, c, row, v);
+  }
+  // Upturned eave tips (most Japanese-distinctive feature)
+  for (const [r, c, v] of [[7,12,56],[6,11,56],[5,10,56],[7,52,56],[6,53,56],[5,54,56]] as const)
+    px(ctx, c, r, v);
+  // Ridge finial
+  for (const [r, c] of [[0,31],[0,32],[0,33]] as const) px(ctx, c, r, 90);
+
+  // Hanging lanterns
+  for (const lc of [21, 42] as const) {
+    px(ctx, lc, 8, 62);
+    px(ctx, lc, 9, 62);
+    px(ctx, lc, 10, 68);  px(ctx, lc + 1, 10, 68);  // cap
+    px(ctx, lc, 11, 168); px(ctx, lc + 1, 11, 168); // lit body
+    px(ctx, lc, 12, 168); px(ctx, lc + 1, 12, 168);
+    px(ctx, lc, 13, 62);  px(ctx, lc + 1, 13, 62);  // bottom
+  }
+
+  // ── Pool/onsen (foreground) ──────────────────────────────────────────
+  const pCX = 32, pCY = 22, pA = 14, pB = 3;
+  for (let r = 0; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      const dx = (c - pCX) / pA, dy = (r - pCY) / pB;
+      const d  = dx * dx + dy * dy;
+      if (d <= 1) {
+        const v = 48 + ((c * 3 + r * 5) % 8);
+        px(ctx, c, r, v);
+      } else if (d <= 1.7) {
+        const n = (c * 7 + r * 3) % 6;
+        px(ctx, c, r, n < 2 ? 70 : 88);
+      }
+    }
+  }
+
+  // Bubbles [col, row, size]
+  for (const [bc, br, size] of [[27,22,2],[34,21,2],[31,23,1],[38,22,1],[25,22,1]] as const) {
+    const dx = (bc - pCX) / pA, dy = (br - pCY) / pB;
+    if (dx * dx + dy * dy > 0.72) continue;
+    const v = 108 + size * 26, dim = Math.round(v * 0.72);
+    px(ctx, bc, br, v);
+    if (size >= 2) {
+      for (const [dc, dr] of [[-1,0],[1,0],[0,-1],[0,1]] as const)
+        px(ctx, bc + dc, br + dr, dim);
+    }
+  }
+
+  // Steam rising from pool
+  for (const [r, c, v] of [
+    [21,28,115],[20,29,105],[19,28,95],[18,30,85],[17,29,72],[16,30,60],
+    [21,34,115],[20,33,105],[19,34,92],[18,33,80],[17,34,68],
+    [21,38,110],[20,39,100],[19,38,88],[18,37,76],
+  ] as const) px(ctx, c, r, v);
+
+  // ── Bamboo (drawn last so it layers in front) ────────────────────────
+  const leftStalks:  [number, number][] = [[3,4],[5,2],[8,5],[10,7],[12,3]];
+  const rightStalks: [number, number][] = [[52,5],[54,2],[57,4],[59,7],[61,3]];
+  for (const [bc, topR] of [...leftStalks, ...rightStalks]) {
+    // Stalk
+    for (let r = topR; r < 19; r++) px(ctx, bc, r, r % 5 === 1 ? 62 : 92);
+    // Leaves (two diagonal pairs at top)
+    const leafV = 112;
+    px(ctx, bc - 1, topR,     leafV); px(ctx, bc - 2, topR - 1, leafV);
+    px(ctx, bc + 1, topR,     leafV); px(ctx, bc + 2, topR - 1, leafV);
+    px(ctx, bc,     topR - 1, leafV); px(ctx, bc - 1, topR - 2, leafV);
+  }
 }
 
 function SpaCanvas() {
